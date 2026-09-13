@@ -3,7 +3,7 @@ services:
     name: app-daniela
     runtime: node
     plan: free
-    buildCommand: npm ci --prefix backend && npx --prefix backend prisma generate && npm --prefix backend run build && npm ci --prefix frontend && npm --prefix frontend run build
+    buildCommand: npm install --prefix backend && npx --prefix backend prisma generate && npm --prefix backend run build && npm install --prefix frontend && npm --prefix frontend run build
     startCommand: cd backend && npx prisma migrate deploy && node dist/main.js
     healthCheckPath: /api/health
     envVars:
