@@ -27,8 +27,13 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new AppExceptionFilter());
 
-  const frontendPath = join(__dirname, '..', '..', 'frontend', 'dist', 'frontend', 'browser');
-  if (existsSync(frontendPath)) {
+  const frontendCandidates = [
+    join(__dirname, '..', '..', '..', 'frontend', 'dist', 'frontend', 'browser'),
+    join(__dirname, '..', '..', 'frontend', 'dist', 'frontend', 'browser'),
+    join(__dirname, '..', '..', '..', 'frontend', 'dist', 'frontend'),
+  ];
+  const frontendPath = frontendCandidates.find((path) => existsSync(join(path, 'index.html')));
+  if (frontendPath) {
     app.useStaticAssets(frontendPath);
     const expressApp = app.getHttpAdapter().getInstance();
     expressApp.get(/^(?!\/api).*/, (_req, res) => {
