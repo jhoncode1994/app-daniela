@@ -1,0 +1,74 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum PaymentStatus {
+  PENDIENTE
+  PAGADA
+}
+
+model Worker {
+  id         String   @id @default(uuid()) @db.Uuid
+  name       String
+  hourlyRate Int      @map("hourly_rate")
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  workShifts WorkShift[]
+  payments   Payment[]
+
+  @@map("workers")
+}
+
+model WorkShift {
+  id               String        @id @default(uuid()) @db.Uuid
+  workerId         String        @map("worker_id") @db.Uuid
+  worker           Worker        @relation(fields: [workerId], references: [id])
+  workDate         DateTime      @map("work_date") @db.Date
+  startTime        String        @map("start_time") @db.VarChar(5)
+  endTime          String        @map("end_time") @db.VarChar(5)
+  mealBreakMinutes Int           @map("meal_break_minutes")
+  grossMinutes     Int           @map("gross_minutes")
+  netMinutes       Int           @map("net_minutes")
+  hourlyRate       Int           @map("hourly_rate")
+  earnedAmount     Int           @map("earned_amount")
+  paymentStatus    PaymentStatus @default(PENDIENTE) @map("payment_status")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  paymentShifts PaymentShift[]
+
+  @@index([workerId, workDate])
+  @@index([paymentStatus])
+  @@map("work_shifts")
+}
+
+model Payment {
+  id          String   @id @default(uuid()) @db.Uuid
+  workerId    String   @map("worker_id") @db.Uuid
+  worker      Worker   @relation(fields: [workerId], references: [id])
+  paymentDate DateTime @map("payment_date") @db.Date
+  amount      Int
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  paymentShifts PaymentShift[]
+
+  @@index([workerId])
+  @@map("payments")
+}
+
+model PaymentShift {
+  paymentId String    @map("payment_id") @db.Uuid
+  shiftId   String    @unique @map("shift_id") @db.Uuid
+  payment   Payment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  shift     WorkShift @relation(fields: [shiftId], references: [id])
+
+  @@id([paymentId, shiftId])
+  @@map("payment_shifts")
+}

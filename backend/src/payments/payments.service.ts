@@ -1,0 +1,154 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PaymentStatus } from '@prisma/client';
+import { dateOnlyToString, toDateOnly, todayInBogota } from '../common/time-money';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreatePaymentDto } from './dto/create-payment.dto';
+import { SettlementQueryDto } from './dto/settlement-query.dto';
+
+@Injectable()
+export class PaymentsService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async preview(query: SettlementQueryDto) {
+    const worker = await this.requireWorker(query.workerId);
+    if (query.from > query.to) {
+      throw new BadRequestException('La fecha inicial no puede ser mayor que la final');
+    }
+
+    const shifts = await this.prisma.workShift.findMany({
+      where: {
+        workerId: query.workerId,
+        workDate: {
+          gte: toDateOnly(query.from),
+          lte: toDateOnly(query.to),
+        },
+      },
+      orderBy: [{ workDate: 'asc' }, { startTime: 'asc' }],
+    });
+
+    const totals = shifts.reduce(
+      (acc, shift) => {
+        acc.grossMinutes += shift.grossMinutes;
+        acc.mealMinutes += shift.mealBreakMinutes;
+        acc.netMinutes += shift.netMinutes;
+        acc.earnedAmount += shift.earnedAmount;
+        if (shift.paymentStatus === PaymentStatus.PAGADA) {
+          acc.paidAmount += shift.earnedAmount;
+        } else {
+          acc.pendingAmount += shift.earnedAmount;
+          acc.pendingShiftIds.push(shift.id);
+        }
+        return acc;
+      },
+      {
+        grossMinutes: 0,
+        mealMinutes: 0,
+        netMinutes: 0,
+        earnedAmount: 0,
+        paidAmount: 0,
+        pendingAmount: 0,
+        pendingShiftIds: [] as string[],
+      },
+    );
+
+    return {
+      worker: { id: worker.id, name: worker.name },
+      from: query.from,
+      to: query.to,
+      ...totals,
+      pendingShiftCount: totals.pendingShiftIds.length,
+      shifts: shifts.map((shift) => ({
+        ...shift,
+        workDate: dateOnlyToString(shift.workDate),
+      })),
+    };
+  }
+
+  async create(dto: CreatePaymentDto) {
+    const preview = await this.preview(dto);
+    if (preview.pendingShiftCount === 0) {
+      throw new BadRequestException('No hay jornadas pendientes en el periodo seleccionado');
+    }
+
+    const paymentDate = dto.paymentDate ?? todayInBogota();
+
+    return this.prisma.$transaction(async (tx) => {
+      const pending = await tx.workShift.findMany({
+        where: {
+          id: { in: preview.pendingShiftIds },
+          paymentStatus: PaymentStatus.PENDIENTE,
+        },
+      });
+
+      if (pending.length !== preview.pendingShiftIds.length) {
+        throw new BadRequestException(
+          'Algunas jornadas ya fueron pagadas. Vuelva a consultar la liquidación.',
+        );
+      }
+
+      const amount = pending.reduce((sum, shift) => sum + shift.earnedAmount, 0);
+      const payment = await tx.payment.create({
+        data: {
+          workerId: dto.workerId,
+          paymentDate: toDateOnly(paymentDate),
+          amount,
+          paymentShifts: {
+            create: pending.map((shift) => ({ shiftId: shift.id })),
+          },
+        },
+        include: {
+          worker: true,
+          paymentShifts: { include: { shift: true } },
+        },
+      });
+
+      await tx.workShift.updateMany({
+        where: { id: { in: pending.map((shift) => shift.id) } },
+        data: { paymentStatus: PaymentStatus.PAGADA },
+      });
+
+      return this.serializePayment(payment);
+    });
+  }
+
+  async findAll(workerId?: string) {
+    const payments = await this.prisma.payment.findMany({
+      where: workerId ? { workerId } : undefined,
+      include: {
+        worker: true,
+        paymentShifts: { include: { shift: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    return payments.map((payment) => this.serializePayment(payment));
+  }
+
+  private async requireWorker(id: string) {
+    const worker = await this.prisma.worker.findUnique({ where: { id } });
+    if (!worker) {
+      throw new NotFoundException('Trabajadora no encontrada');
+    }
+    return worker;
+  }
+
+  private serializePayment(payment: {
+    id: string;
+    workerId: string;
+    paymentDate: Date;
+    amount: number;
+    createdAt: Date;
+    worker: { id: string; name: string };
+    paymentShifts: { shiftId: string; shift: { workDate: Date; earnedAmount: number } }[];
+  }) {
+    return {
+      id: payment.id,
+      workerId: payment.workerId,
+      worker: payment.worker,
+      paymentDate: dateOnlyToString(payment.paymentDate),
+      amount: payment.amount,
+      createdAt: payment.createdAt,
+      shiftIds: payment.paymentShifts.map((item) => item.shiftId),
+      shiftCount: payment.paymentShifts.length,
+    };
+  }
+}

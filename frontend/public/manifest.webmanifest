@@ -1,0 +1,25 @@
+{
+  "name": "Control de jornadas",
+  "short_name": "Jornadas",
+  "description": "Registro de jornadas y pagos",
+  "theme_color": "#A56B74",
+  "background_color": "#F7F3F1",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

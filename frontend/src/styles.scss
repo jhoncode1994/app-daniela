@@ -1,0 +1,119 @@
+@use '@angular/material' as mat;
+
+:root {
+  --color-primary: #a56b74;
+  --color-on-primary: #ffffff;
+  --color-secondary: #c4a49a;
+  --color-background: #f7f3f1;
+  --color-foreground: #3f3335;
+  --color-card: #ffffff;
+  --color-muted: #f3e8e6;
+  --color-muted-foreground: #6b5c5f;
+  --color-border: #e8d8d6;
+  --color-destructive: #b3261e;
+  --color-success: #3d6b4f;
+  --color-success-soft: #e6f2ea;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --radius: 18px;
+  --shadow-sm: 0 1px 2px rgba(63, 51, 53, 0.06);
+  --touch: 48px;
+}
+
+html {
+  @include mat.theme(
+    (
+      color: (
+        theme-type: light,
+        primary: mat.$rose-palette,
+        tertiary: mat.$red-palette,
+      ),
+      typography: (
+        plain-family: 'Plus Jakarta Sans',
+        brand-family: 'Plus Jakarta Sans',
+      ),
+      density: 0,
+    )
+  );
+}
+
+html {
+  --mat-sys-primary: var(--color-primary);
+  --mat-sys-on-primary: var(--color-on-primary);
+  --mat-sys-surface: var(--color-background);
+  --mat-sys-on-surface: var(--color-foreground);
+  --mat-sys-outline-variant: var(--color-border);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+h1 {
+  margin: 0 0 var(--space-md);
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+h2 {
+  margin: var(--space-lg) 0 var(--space-md);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+a,
+button,
+.mat-mdc-button,
+.mat-mdc-unelevated-button,
+.mat-mdc-outlined-button,
+.mat-mdc-button-base {
+  cursor: pointer;
+}
+
+button.mat-mdc-button,
+button.mat-mdc-unelevated-button,
+button.mat-mdc-outlined-button,
+a.mat-mdc-unelevated-button,
+a.mat-mdc-outlined-button,
+a.mat-mdc-button {
+  min-height: var(--touch);
+}
+
+.mat-mdc-card {
+  background: var(--color-card);
+  border-radius: var(--radius) !important;
+  box-shadow: var(--shadow-sm) !important;
+  border: 1px solid var(--color-border);
+}
+
+.mat-mdc-text-field-wrapper {
+  background: var(--color-card) !important;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
