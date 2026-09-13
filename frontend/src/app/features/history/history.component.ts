@@ -161,9 +161,8 @@ interface DayGroup {
       }
       .segment {
         display: flex;
-        justify-content: space-between;
+        flex-direction: column;
         gap: 8px;
-        align-items: flex-start;
         padding-top: 10px;
         margin-top: 10px;
         border-top: 1px solid var(--color-border);
@@ -173,9 +172,20 @@ interface DayGroup {
       }
       .segment-actions {
         display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 4px;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+      }
+      @media (min-width: 640px) {
+        .segment {
+          flex-direction: row;
+          justify-content: space-between;
+          align-items: flex-start;
+        }
+        .segment-actions {
+          flex-direction: column;
+          align-items: flex-end;
+        }
       }
       mat-chip {
         background: var(--color-muted);

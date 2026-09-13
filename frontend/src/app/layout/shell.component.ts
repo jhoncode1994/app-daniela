@@ -13,7 +13,7 @@ import { AuthService } from '../core/auth.service';
       <mat-toolbar>
         <span class="title">Jornadas</span>
         <span class="spacer"></span>
-        <a mat-button routerLink="/trabajadoras">Trabajadoras</a>
+        <a mat-button class="desktop-only" routerLink="/trabajadoras">Trabajadoras</a>
         <button mat-button type="button" (click)="auth.logout()">Salir</button>
       </mat-toolbar>
 
@@ -30,7 +30,7 @@ import { AuthService } from '../core/auth.service';
           <mat-icon aria-hidden="true">add_circle</mat-icon>
           <span>Registrar</span>
         </a>
-        <a routerLink="/jornadas" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
+        <a routerLink="/jornadas" routerLinkActive="active">
           <mat-icon aria-hidden="true">history</mat-icon>
           <span>Historial</span>
         </a>
@@ -50,24 +50,29 @@ import { AuthService } from '../core/auth.service';
         background: var(--color-background);
       }
       mat-toolbar {
+        position: sticky;
+        top: 0;
+        z-index: 20;
         background: var(--color-card) !important;
         color: var(--color-foreground) !important;
         border-bottom: 1px solid var(--color-border);
         padding-top: env(safe-area-inset-top);
+        min-height: 56px;
       }
       .title {
         font-weight: 700;
         color: var(--color-primary);
+        font-size: 1.1rem;
       }
       .spacer {
         flex: 1;
       }
       .content {
         flex: 1;
-        width: min(720px, 100%);
+        width: min(var(--content-max), 100%);
         margin: 0 auto;
-        padding: var(--space-md) var(--space-md) 104px;
-        box-sizing: border-box;
+        padding: var(--page-pad);
+        padding-bottom: calc(var(--bottom-nav-space) + env(safe-area-inset-bottom));
       }
       .bottom-nav {
         position: fixed;
@@ -75,11 +80,12 @@ import { AuthService } from '../core/auth.service';
         right: 0;
         bottom: 0;
         display: grid;
-        grid-template-columns: repeat(4, 1fr);
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 4px;
         background: var(--color-card);
         border-top: 1px solid var(--color-border);
-        padding: 8px 4px calc(8px + env(safe-area-inset-bottom));
-        z-index: 10;
+        padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
+        z-index: 30;
       }
       .bottom-nav a {
         display: flex;
@@ -87,17 +93,29 @@ import { AuthService } from '../core/auth.service';
         align-items: center;
         justify-content: center;
         gap: 2px;
-        min-height: 48px;
+        min-height: 52px;
         text-decoration: none;
         color: var(--color-muted-foreground);
-        font-size: 12px;
-        font-weight: 500;
+        font-size: 11px;
+        font-weight: 600;
         border-radius: 12px;
+        padding: 4px 2px;
         transition: color 200ms ease, background-color 200ms ease;
       }
       .bottom-nav a.active {
         color: var(--color-primary);
         background: var(--color-muted);
+      }
+      .desktop-only {
+        display: none;
+      }
+      @media (min-width: 768px) {
+        .desktop-only {
+          display: inline-flex;
+        }
+        .bottom-nav a {
+          font-size: 12px;
+        }
       }
     `,
   ],

@@ -42,7 +42,8 @@ import { MoneyPipe } from '../../shared/money.pipe';
       }
 
       <div class="actions">
-        <a mat-stroked-button routerLink="/jornadas">Historial por persona</a>
+        <a mat-stroked-button routerLink="/trabajadoras">Trabajadoras</a>
+        <a mat-stroked-button routerLink="/jornadas">Historial</a>
         <a mat-stroked-button routerLink="/liquidaciones">Liquidaciones</a>
       </div>
     } @else {
@@ -104,12 +105,23 @@ import { MoneyPipe } from '../../shared/money.pipe';
       }
       .actions {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 12px;
+        grid-template-columns: 1fr;
+        gap: 10px;
         margin-top: 20px;
       }
       .actions a {
         min-height: var(--touch);
+        width: 100%;
+      }
+      @media (min-width: 480px) {
+        .actions {
+          grid-template-columns: 1fr 1fr 1fr;
+        }
+      }
+      @media (max-width: 360px) {
+        .totals {
+          grid-template-columns: 1fr;
+        }
       }
     `,
   ],

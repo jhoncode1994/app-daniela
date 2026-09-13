@@ -42,12 +42,12 @@ import { httpErrorMessage } from '../../core/http-error';
         min-height: 100dvh;
         display: grid;
         place-items: center;
-        padding: var(--space-lg);
+        padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
         background: var(--color-background);
       }
       mat-card {
         width: min(420px, 100%);
-        padding: var(--space-lg);
+        padding: clamp(16px, 4vw, 24px);
       }
       .eyebrow {
         margin: 0 0 6px;
