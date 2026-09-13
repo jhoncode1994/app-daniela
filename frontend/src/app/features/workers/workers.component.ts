@@ -69,6 +69,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
             <button mat-button type="button" (click)="toggle(worker)">
               {{ worker.active ? 'Desactivar' : 'Activar' }}
             </button>
+            <button mat-button color="warn" type="button" (click)="remove(worker)">Eliminar</button>
           </div>
         </mat-card>
       }
@@ -206,6 +207,25 @@ export class WorkersComponent implements OnInit {
   toggle(worker: Worker): void {
     this.api.updateWorker(worker.id, { active: !worker.active }).subscribe({
       next: () => this.reload(),
+      error: (err) => this.snack.open(httpErrorMessage(err), 'OK', { duration: 4000 }),
+    });
+  }
+
+  remove(worker: Worker): void {
+    const ok = window.confirm(
+      `¿Eliminar a ${worker.name}? También se borrarán sus jornadas y pagos. Esta acción no se puede deshacer.`,
+    );
+    if (!ok) {
+      return;
+    }
+    this.api.deleteWorker(worker.id).subscribe({
+      next: () => {
+        if (this.editingId() === worker.id) {
+          this.cancel();
+        }
+        this.snack.open('Trabajadora eliminada', 'OK', { duration: 2500 });
+        this.reload();
+      },
       error: (err) => this.snack.open(httpErrorMessage(err), 'OK', { duration: 4000 }),
     });
   }

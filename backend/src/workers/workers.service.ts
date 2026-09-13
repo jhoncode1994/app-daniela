@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateWorkerDto } from './dto/create-worker.dto';
 import { UpdateWorkerDto } from './dto/update-worker.dto';
@@ -45,16 +45,28 @@ export class WorkersService {
 
   async remove(id: string) {
     await this.findOne(id);
-    const [shiftCount, paymentCount] = await Promise.all([
-      this.prisma.workShift.count({ where: { workerId: id } }),
-      this.prisma.payment.count({ where: { workerId: id } }),
-    ]);
-    if (shiftCount > 0 || paymentCount > 0) {
-      throw new ConflictException(
-        'No se puede eliminar porque tiene jornadas o pagos. Desactívela en su lugar.',
-      );
-    }
-    await this.prisma.worker.delete({ where: { id } });
+
+    await this.prisma.$transaction(async (tx) => {
+      const shifts = await tx.workShift.findMany({
+        where: { workerId: id },
+        select: { id: true },
+      });
+      const shiftIds = shifts.map((shift) => shift.id);
+
+      if (shiftIds.length > 0) {
+        await tx.paymentShift.deleteMany({
+          where: { shiftId: { in: shiftIds } },
+        });
+      }
+
+      await tx.paymentShift.deleteMany({
+        where: { payment: { workerId: id } },
+      });
+      await tx.payment.deleteMany({ where: { workerId: id } });
+      await tx.workShift.deleteMany({ where: { workerId: id } });
+      await tx.worker.delete({ where: { id } });
+    });
+
     return { deleted: true };
   }
 }
