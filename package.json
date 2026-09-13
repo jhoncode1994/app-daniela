@@ -1,0 +1,11 @@
+{
+  "name": "app-daniela",
+  "private": true,
+  "engines": {
+    "node": "22.x"
+  },
+  "scripts": {
+    "build": "npm install --prefix backend && npx --prefix backend prisma generate && npm --prefix backend run build && npm install --prefix frontend && npm --prefix frontend run build",
+    "start": "cd backend && npx prisma migrate deploy && node dist/main.js"
+  }
+}
