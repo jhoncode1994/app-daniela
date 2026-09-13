@@ -14,12 +14,18 @@ import { QueryShiftsDto } from './dto/query-shifts.dto';
 import { ShiftInputDto } from './dto/shift-input.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
 
+const shiftInclude = {
+  worker: true,
+  provider: true,
+} as const;
+
 @Injectable()
 export class ShiftsService {
   constructor(private readonly prisma: PrismaService) {}
 
   async preview(dto: ShiftInputDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
+    const provider = await this.requireActiveProvider(dto.providerId);
     const calculation = calculateShift({
       startTime: dto.startTime,
       endTime: dto.endTime,
@@ -28,6 +34,7 @@ export class ShiftsService {
     });
     return {
       worker: { id: worker.id, name: worker.name },
+      provider: { id: provider.id, name: provider.name },
       workDate: dto.workDate,
       startTime: dto.startTime,
       endTime: dto.endTime,
@@ -37,6 +44,7 @@ export class ShiftsService {
 
   async previewBatch(dto: BatchShiftsDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
+    const provider = await this.requireActiveProvider(dto.providerId);
     const segments = dto.segments.map((segment) => {
       const calculation = calculateShift({
         startTime: segment.startTime,
@@ -53,6 +61,7 @@ export class ShiftsService {
 
     return {
       worker: { id: worker.id, name: worker.name },
+      provider: { id: provider.id, name: provider.name },
       workDate: dto.workDate,
       segments,
       totals: {
@@ -67,16 +76,19 @@ export class ShiftsService {
 
   async create(dto: ShiftInputDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
-    return this.createForWorker(worker, dto);
+    const provider = await this.requireActiveProvider(dto.providerId);
+    return this.createForWorker(worker, provider, dto);
   }
 
   async createBatch(dto: BatchShiftsDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
+    const provider = await this.requireActiveProvider(dto.providerId);
     const created: Awaited<ReturnType<ShiftsService['createForWorker']>>[] = [];
     for (const segment of dto.segments) {
       created.push(
-        await this.createForWorker(worker, {
+        await this.createForWorker(worker, provider, {
           workerId: dto.workerId,
+          providerId: dto.providerId,
           workDate: dto.workDate,
           startTime: segment.startTime,
           endTime: segment.endTime,
@@ -89,6 +101,7 @@ export class ShiftsService {
 
   async clockIn(dto: ClockInDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
+    const provider = await this.requireActiveProvider(dto.providerId);
     const open = await this.findOpenShift(worker.id);
     if (open) {
       throw new ConflictException(
@@ -99,6 +112,7 @@ export class ShiftsService {
     const shift = await this.prisma.workShift.create({
       data: {
         workerId: worker.id,
+        providerId: provider.id,
         workDate: toDateOnly(dto.workDate),
         startTime: dto.startTime,
         endTime: null,
@@ -109,7 +123,7 @@ export class ShiftsService {
         earnedAmount: 0,
         paymentStatus: PaymentStatus.PENDIENTE,
       },
-      include: { worker: true },
+      include: shiftInclude,
     });
     return this.serialize(shift);
   }
@@ -141,7 +155,7 @@ export class ShiftsService {
         netMinutes: calculation.netMinutes,
         earnedAmount: calculation.earnedAmount,
       },
-      include: { worker: true },
+      include: shiftInclude,
     });
     return this.serialize(updated);
   }
@@ -149,11 +163,12 @@ export class ShiftsService {
   async findOpenForWorker(workerId: string) {
     await this.requireActiveWorker(workerId);
     const open = await this.findOpenShift(workerId);
-    return open ? this.serialize({ ...open, worker: open.worker }) : null;
+    return open ? this.serialize(open) : null;
   }
 
   private async createForWorker(
     worker: { id: string; name: string; hourlyRate: number },
+    provider: { id: string; name: string },
     dto: ShiftInputDto,
   ) {
     const calculation = calculateShift({
@@ -166,6 +181,7 @@ export class ShiftsService {
     const shift = await this.prisma.workShift.create({
       data: {
         workerId: worker.id,
+        providerId: provider.id,
         workDate: toDateOnly(dto.workDate),
         startTime: dto.startTime,
         endTime: dto.endTime,
@@ -176,7 +192,7 @@ export class ShiftsService {
         earnedAmount: calculation.earnedAmount,
         paymentStatus: PaymentStatus.PENDIENTE,
       },
-      include: { worker: true },
+      include: shiftInclude,
     });
     return this.serialize(shift);
   }
@@ -185,6 +201,9 @@ export class ShiftsService {
     const where: Prisma.WorkShiftWhereInput = {};
     if (query.workerId) {
       where.workerId = query.workerId;
+    }
+    if (query.providerId) {
+      where.providerId = query.providerId;
     }
     if (query.paymentStatus) {
       where.paymentStatus = query.paymentStatus;
@@ -201,7 +220,7 @@ export class ShiftsService {
 
     const shifts = await this.prisma.workShift.findMany({
       where,
-      include: { worker: true },
+      include: shiftInclude,
       orderBy: [{ workDate: 'desc' }, { startTime: 'desc' }],
     });
     return shifts.map((shift) => this.serialize(shift));
@@ -210,7 +229,7 @@ export class ShiftsService {
   async findOne(id: string) {
     const shift = await this.prisma.workShift.findUnique({
       where: { id },
-      include: { worker: true },
+      include: shiftInclude,
     });
     if (!shift) {
       throw new NotFoundException('Jornada no encontrada');
@@ -244,7 +263,7 @@ export class ShiftsService {
           netMinutes: 0,
           earnedAmount: 0,
         },
-        include: { worker: true },
+        include: shiftInclude,
       });
       return this.serialize(updated);
     }
@@ -267,7 +286,7 @@ export class ShiftsService {
         netMinutes: calculation.netMinutes,
         earnedAmount: calculation.earnedAmount,
       },
-      include: { worker: true },
+      include: shiftInclude,
     });
     return this.serialize(updated);
   }
@@ -287,7 +306,7 @@ export class ShiftsService {
   private async findOpenShift(workerId: string) {
     return this.prisma.workShift.findFirst({
       where: { workerId, endTime: null },
-      include: { worker: true },
+      include: shiftInclude,
       orderBy: [{ workDate: 'asc' }, { startTime: 'asc' }, { createdAt: 'asc' }],
     });
   }
@@ -303,9 +322,21 @@ export class ShiftsService {
     return worker;
   }
 
+  private async requireActiveProvider(id: string) {
+    const provider = await this.prisma.provider.findUnique({ where: { id } });
+    if (!provider) {
+      throw new NotFoundException('Proveedor no encontrado');
+    }
+    if (!provider.active) {
+      throw new BadRequestException('El proveedor está inactivo');
+    }
+    return provider;
+  }
+
   private serialize(shift: {
     id: string;
     workerId: string;
+    providerId: string;
     workDate: Date;
     startTime: string;
     endTime: string | null;
@@ -318,11 +349,14 @@ export class ShiftsService {
     createdAt: Date;
     updatedAt: Date;
     worker: { id: string; name: string };
+    provider: { id: string; name: string };
   }) {
     return {
       ...shift,
       workDate: dateOnlyToString(shift.workDate),
       open: shift.endTime === null,
+      worker: { id: shift.worker.id, name: shift.worker.name },
+      provider: { id: shift.provider.id, name: shift.provider.name },
     };
   }
 }

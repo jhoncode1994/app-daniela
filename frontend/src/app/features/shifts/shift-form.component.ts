@@ -9,7 +9,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/api.service';
 import { httpErrorMessage } from '../../core/http-error';
-import { WorkShift, Worker } from '../../core/models';
+import { WorkShift, Worker, Provider } from '../../core/models';
 import { DurationPipe } from '../../shared/duration.pipe';
 import { MoneyPipe } from '../../shared/money.pipe';
 
@@ -32,8 +32,8 @@ import { MoneyPipe } from '../../shared/money.pipe';
       <p class="eyebrow">Fichaje</p>
       <h1>Registrar jornada</h1>
       <p class="hint">
-        Registra solo el ingreso o solo la salida. El valor se calcula cuando hay ingreso y salida.
-        Puedes hacer varios tramos el mismo día.
+        Elige trabajadora y proveedor (ej. Alma Rosa o Bizcocho). Registra ingreso o salida por separado;
+        el valor se calcula al cerrar cada tramo.
       </p>
 
       <form [formGroup]="form">
@@ -42,6 +42,15 @@ import { MoneyPipe } from '../../shared/money.pipe';
           <mat-select formControlName="workerId" (selectionChange)="reload()">
             @for (worker of workers(); track worker.id) {
               <mat-option [value]="worker.id">{{ worker.name }} · {{ worker.hourlyRate | money }}/h</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline">
+          <mat-label>Proveedor</mat-label>
+          <mat-select formControlName="providerId" (selectionChange)="reload()">
+            @for (provider of providers(); track provider.id) {
+              <mat-option [value]="provider.id">{{ provider.name }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -56,7 +65,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
         <mat-card class="open-card">
           <p class="status">Ingreso abierto</p>
           <h2>{{ open.startTime }} · {{ open.workDate }}</h2>
-          <p>Aún no suma horas. Al registrar la salida se calcula este tramo.</p>
+          <p>Proveedor: <strong>{{ open.provider.name }}</strong>. Aún no suma horas.</p>
 
           <form [formGroup]="outForm" (ngSubmit)="clockOut()">
             <mat-form-field appearance="outline">
@@ -115,10 +124,10 @@ import { MoneyPipe } from '../../shared/money.pipe';
           <mat-card class="item" [class.open]="!shift.endTime">
             @if (shift.endTime) {
               <p class="time">{{ shift.startTime }} – {{ shift.endTime }}</p>
-              <p>{{ shift.netMinutes | duration }} · {{ shift.earnedAmount | money }}</p>
+              <p>{{ shift.provider.name }} · {{ shift.netMinutes | duration }} · {{ shift.earnedAmount | money }}</p>
             } @else {
               <p class="time">{{ shift.startTime }} – en curso</p>
-              <p>Esperando salida</p>
+              <p>{{ shift.provider.name }} · Esperando salida</p>
             }
           </mat-card>
         }
@@ -189,6 +198,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
 })
 export class ShiftFormComponent implements OnInit {
   readonly workers = signal<Worker[]>([]);
+  readonly providers = signal<Provider[]>([]);
   readonly dayShifts = signal<WorkShift[]>([]);
   readonly openShift = signal<WorkShift | null>(null);
   readonly saving = signal(false);
@@ -212,6 +222,7 @@ export class ShiftFormComponent implements OnInit {
   ) {
     this.form = this.fb.nonNullable.group({
       workerId: ['', Validators.required],
+      providerId: ['', Validators.required],
       workDate: [todayLocal(), Validators.required],
     });
     this.inForm = this.fb.nonNullable.group({
@@ -235,20 +246,39 @@ export class ShiftFormComponent implements OnInit {
       }
       this.reload();
     });
+
+    this.api.getProviders().subscribe((providers) => {
+      const active = providers.filter((provider) => provider.active);
+      this.providers.set(active);
+      const queryProviderId = this.route.snapshot.queryParamMap.get('providerId');
+      if (queryProviderId && active.some((provider) => provider.id === queryProviderId)) {
+        this.form.patchValue({ providerId: queryProviderId });
+      } else if (active.length === 1) {
+        this.form.patchValue({ providerId: active[0].id });
+      }
+      this.reload();
+    });
   }
 
   reload(): void {
-    const { workerId, workDate } = this.form.getRawValue();
+    const { workerId, providerId, workDate } = this.form.getRawValue();
     if (!workerId || !workDate) {
       this.dayShifts.set([]);
       this.openShift.set(null);
       return;
     }
 
-    this.api.getShifts({ workerId, from: workDate, to: workDate }).subscribe({
-      next: (shifts) => this.dayShifts.set(shifts),
-      error: () => this.dayShifts.set([]),
-    });
+    this.api
+      .getShifts({
+        workerId,
+        providerId: providerId || undefined,
+        from: workDate,
+        to: workDate,
+      })
+      .subscribe({
+        next: (shifts) => this.dayShifts.set(shifts),
+        error: () => this.dayShifts.set([]),
+      });
 
     this.api.getOpenShift(workerId).subscribe({
       next: (open) => this.openShift.set(open),
@@ -261,10 +291,11 @@ export class ShiftFormComponent implements OnInit {
       return;
     }
     this.saving.set(true);
-    const { workerId, workDate } = this.form.getRawValue();
+    const { workerId, providerId, workDate } = this.form.getRawValue();
     this.api
       .clockIn({
         workerId,
+        providerId,
         workDate,
         startTime: this.inForm.getRawValue().startTime,
       })

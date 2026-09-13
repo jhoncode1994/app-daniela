@@ -14,6 +14,7 @@ import { AuthService } from '../core/auth.service';
         <span class="title">Jornadas</span>
         <span class="spacer"></span>
         <a mat-button class="desktop-only" routerLink="/trabajadoras">Trabajadoras</a>
+        <a mat-button class="desktop-only" routerLink="/proveedores">Proveedores</a>
         <button mat-button type="button" (click)="auth.logout()">Salir</button>
       </mat-toolbar>
 

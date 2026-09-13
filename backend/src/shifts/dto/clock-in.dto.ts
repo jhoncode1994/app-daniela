@@ -4,6 +4,9 @@ export class ClockInDto {
   @IsUUID()
   workerId: string;
 
+  @IsUUID()
+  providerId: string;
+
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'La fecha debe tener el formato YYYY-MM-DD' })
   workDate: string;
 

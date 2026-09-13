@@ -8,7 +8,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/api.service';
 import { httpErrorMessage } from '../../core/http-error';
-import { PaymentRecord, SettlementPreview, Worker } from '../../core/models';
+import { PaymentRecord, Provider, SettlementPreview, Worker } from '../../core/models';
 import { DurationPipe } from '../../shared/duration.pipe';
 import { MoneyPipe } from '../../shared/money.pipe';
 
@@ -29,7 +29,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
     <div class="page-enter">
       <p class="eyebrow">Pagos</p>
       <h1>Liquidación</h1>
-      <p class="hint">Consulta un periodo y registra el pago pendiente sin doble cobro.</p>
+      <p class="hint">Elige trabajadora y proveedor (ej. Claudia × Bizcocho) para liquidar solo ese tiempo.</p>
 
       <form [formGroup]="form" (ngSubmit)="preview()">
         <mat-form-field appearance="outline">
@@ -37,6 +37,14 @@ import { MoneyPipe } from '../../shared/money.pipe';
           <mat-select formControlName="workerId">
             @for (worker of workers(); track worker.id) {
               <mat-option [value]="worker.id">{{ worker.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline">
+          <mat-label>Proveedor</mat-label>
+          <mat-select formControlName="providerId">
+            @for (provider of providers(); track provider.id) {
+              <mat-option [value]="provider.id">{{ provider.name }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -53,7 +61,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
 
       @if (settlement(); as data) {
         <mat-card class="preview">
-          <h2>{{ data.worker.name }}</h2>
+          <h2>{{ data.worker.name }} · {{ data.provider.name }}</h2>
           <p class="range">{{ data.from }} a {{ data.to }}</p>
           <div class="grid">
             <div>
@@ -95,7 +103,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
       @for (payment of payments(); track payment.id) {
         <mat-card class="item">
           <div>
-            <h3>{{ payment.worker.name }}</h3>
+            <h3>{{ payment.worker.name }}@if (payment.provider) { · {{ payment.provider.name }} }</h3>
             <p>{{ payment.paymentDate }} · {{ payment.shiftCount }} jornada(s)</p>
           </div>
           <strong>{{ payment.amount | money }}</strong>
@@ -186,6 +194,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
 })
 export class SettlementsComponent implements OnInit {
   readonly workers = signal<Worker[]>([]);
+  readonly providers = signal<Provider[]>([]);
   readonly settlement = signal<SettlementPreview | null>(null);
   readonly payments = signal<PaymentRecord[]>([]);
   readonly paying = signal(false);
@@ -198,6 +207,7 @@ export class SettlementsComponent implements OnInit {
   ) {
     this.form = fb.nonNullable.group({
       workerId: ['', Validators.required],
+      providerId: ['', Validators.required],
       from: ['', Validators.required],
       to: ['', Validators.required],
     });
@@ -210,6 +220,13 @@ export class SettlementsComponent implements OnInit {
         this.form.patchValue({ workerId: workers[0].id });
       }
     });
+    this.api.getProviders().subscribe((providers) => {
+      const active = providers.filter((provider) => provider.active);
+      this.providers.set(active);
+      if (active.length === 1) {
+        this.form.patchValue({ providerId: active[0].id });
+      }
+    });
     this.reloadPayments();
   }
 
@@ -217,8 +234,8 @@ export class SettlementsComponent implements OnInit {
     if (this.form.invalid) {
       return;
     }
-    const { workerId, from, to } = this.form.getRawValue();
-    this.api.previewSettlement(workerId, from, to).subscribe({
+    const { workerId, providerId, from, to } = this.form.getRawValue();
+    this.api.previewSettlement(workerId, providerId, from, to).subscribe({
       next: (data) => this.settlement.set(data),
       error: (err) => this.snack.open(httpErrorMessage(err), 'OK', { duration: 4000 }),
     });
@@ -229,12 +246,17 @@ export class SettlementsComponent implements OnInit {
       return;
     }
     const current = this.settlement();
-    if (current && !window.confirm(`¿Registrar el pago de ${current.pendingAmount} por ${current.pendingShiftCount} jornada(s)?`)) {
+    if (
+      current &&
+      !window.confirm(
+        `¿Registrar el pago de ${current.pendingAmount} para ${current.worker.name} en ${current.provider.name}?`,
+      )
+    ) {
       return;
     }
     this.paying.set(true);
-    const { workerId, from, to } = this.form.getRawValue();
-    this.api.createPayment({ workerId, from, to }).subscribe({
+    const { workerId, providerId, from, to } = this.form.getRawValue();
+    this.api.createPayment({ workerId, providerId, from, to }).subscribe({
       next: () => {
         this.paying.set(false);
         this.snack.open('Pago registrado', 'OK', { duration: 2500 });

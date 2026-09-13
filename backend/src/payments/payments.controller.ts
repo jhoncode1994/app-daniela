@@ -18,7 +18,7 @@ export class PaymentsController {
   }
 
   @Get('payments')
-  findAll(@Query('workerId') workerId?: string) {
-    return this.paymentsService.findAll(workerId);
+  findAll(@Query('workerId') workerId?: string, @Query('providerId') providerId?: string) {
+    return this.paymentsService.findAll(workerId, providerId);
   }
 }

@@ -11,6 +11,7 @@ export class PaymentsService {
 
   async preview(query: SettlementQueryDto) {
     const worker = await this.requireWorker(query.workerId);
+    const provider = await this.requireProvider(query.providerId);
     if (query.from > query.to) {
       throw new BadRequestException('La fecha inicial no puede ser mayor que la final');
     }
@@ -18,12 +19,14 @@ export class PaymentsService {
     const shifts = await this.prisma.workShift.findMany({
       where: {
         workerId: query.workerId,
+        providerId: query.providerId,
         endTime: { not: null },
         workDate: {
           gte: toDateOnly(query.from),
           lte: toDateOnly(query.to),
         },
       },
+      include: { provider: true },
       orderBy: [{ workDate: 'asc' }, { startTime: 'asc' }],
     });
 
@@ -54,6 +57,7 @@ export class PaymentsService {
 
     return {
       worker: { id: worker.id, name: worker.name },
+      provider: { id: provider.id, name: provider.name },
       from: query.from,
       to: query.to,
       ...totals,
@@ -61,6 +65,7 @@ export class PaymentsService {
       shifts: shifts.map((shift) => ({
         ...shift,
         workDate: dateOnlyToString(shift.workDate),
+        provider: { id: shift.provider.id, name: shift.provider.name },
       })),
     };
   }
@@ -78,6 +83,7 @@ export class PaymentsService {
         where: {
           id: { in: preview.pendingShiftIds },
           paymentStatus: PaymentStatus.PENDIENTE,
+          providerId: dto.providerId,
         },
       });
 
@@ -91,6 +97,7 @@ export class PaymentsService {
       const payment = await tx.payment.create({
         data: {
           workerId: dto.workerId,
+          providerId: dto.providerId,
           paymentDate: toDateOnly(paymentDate),
           amount,
           paymentShifts: {
@@ -99,6 +106,7 @@ export class PaymentsService {
         },
         include: {
           worker: true,
+          provider: true,
           paymentShifts: { include: { shift: true } },
         },
       });
@@ -112,11 +120,15 @@ export class PaymentsService {
     });
   }
 
-  async findAll(workerId?: string) {
+  async findAll(workerId?: string, providerId?: string) {
     const payments = await this.prisma.payment.findMany({
-      where: workerId ? { workerId } : undefined,
+      where: {
+        ...(workerId ? { workerId } : {}),
+        ...(providerId ? { providerId } : {}),
+      },
       include: {
         worker: true,
+        provider: true,
         paymentShifts: { include: { shift: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -132,19 +144,31 @@ export class PaymentsService {
     return worker;
   }
 
+  private async requireProvider(id: string) {
+    const provider = await this.prisma.provider.findUnique({ where: { id } });
+    if (!provider) {
+      throw new NotFoundException('Proveedor no encontrado');
+    }
+    return provider;
+  }
+
   private serializePayment(payment: {
     id: string;
     workerId: string;
+    providerId: string | null;
     paymentDate: Date;
     amount: number;
     createdAt: Date;
     worker: { id: string; name: string };
+    provider: { id: string; name: string } | null;
     paymentShifts: { shiftId: string; shift: { workDate: Date; earnedAmount: number } }[];
   }) {
     return {
       id: payment.id,
       workerId: payment.workerId,
       worker: payment.worker,
+      providerId: payment.providerId,
+      provider: payment.provider,
       paymentDate: dateOnlyToString(payment.paymentDate),
       amount: payment.amount,
       createdAt: payment.createdAt,

@@ -7,10 +7,20 @@ export interface Worker {
   updatedAt: string;
 }
 
+export interface Provider {
+  id: string;
+  name: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface WorkShift {
   id: string;
   workerId: string;
+  providerId: string;
   worker: { id: string; name: string };
+  provider: { id: string; name: string };
   workDate: string;
   startTime: string;
   endTime: string | null;
@@ -27,6 +37,7 @@ export interface WorkShift {
 
 export interface ShiftPreview {
   worker: { id: string; name: string };
+  provider: { id: string; name: string };
   workDate: string;
   startTime: string;
   endTime: string;
@@ -39,6 +50,7 @@ export interface ShiftPreview {
 
 export interface ShiftInput {
   workerId: string;
+  providerId: string;
   workDate: string;
   startTime: string;
   endTime: string;
@@ -53,12 +65,14 @@ export interface ShiftSegmentInput {
 
 export interface BatchShiftsInput {
   workerId: string;
+  providerId: string;
   workDate: string;
   segments: ShiftSegmentInput[];
 }
 
 export interface BatchShiftPreview {
   worker: { id: string; name: string };
+  provider: { id: string; name: string };
   workDate: string;
   segments: {
     startTime: string;
@@ -93,6 +107,7 @@ export interface DashboardSummary {
 
 export interface SettlementPreview {
   worker: { id: string; name: string };
+  provider: { id: string; name: string };
   from: string;
   to: string;
   grossMinutes: number;
@@ -109,6 +124,8 @@ export interface PaymentRecord {
   id: string;
   workerId: string;
   worker: { id: string; name: string };
+  providerId: string | null;
+  provider: { id: string; name: string } | null;
   paymentDate: string;
   amount: number;
   createdAt: string;

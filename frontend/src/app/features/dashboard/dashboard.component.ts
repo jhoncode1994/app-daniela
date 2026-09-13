@@ -51,6 +51,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
 
         <div class="actions">
           <a mat-stroked-button routerLink="/trabajadoras">Trabajadoras</a>
+          <a mat-stroked-button routerLink="/proveedores">Proveedores</a>
           <a mat-stroked-button routerLink="/jornadas">Historial</a>
           <a mat-stroked-button routerLink="/liquidaciones">Liquidaciones</a>
         </div>

@@ -21,6 +21,11 @@ export const routes: Routes = [
           import('./features/workers/workers.component').then((m) => m.WorkersComponent),
       },
       {
+        path: 'proveedores',
+        loadComponent: () =>
+          import('./features/providers/providers.component').then((m) => m.ProvidersComponent),
+      },
+      {
         path: 'jornadas/nueva',
         loadComponent: () =>
           import('./features/shifts/shift-form.component').then((m) => m.ShiftFormComponent),

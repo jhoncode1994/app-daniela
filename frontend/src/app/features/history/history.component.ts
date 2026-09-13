@@ -10,7 +10,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/api.service';
 import { httpErrorMessage } from '../../core/http-error';
-import { WorkShift, Worker } from '../../core/models';
+import { WorkShift, Worker, Provider } from '../../core/models';
 import { DurationPipe } from '../../shared/duration.pipe';
 import { MoneyPipe } from '../../shared/money.pipe';
 
@@ -60,9 +60,18 @@ interface DayGroup {
       <a mat-button routerLink="/jornadas" class="back">Volver a trabajadoras</a>
       <p class="eyebrow">Historial</p>
       <h1>{{ selectedWorker()!.name }}</h1>
-      <p class="hint">Cada día puede tener varios ingresos y salidas.</p>
+      <p class="hint">Cada día puede tener varios ingresos y salidas. Filtra por proveedor si quieres.</p>
 
       <form [formGroup]="form" (ngSubmit)="load()">
+        <mat-form-field appearance="outline">
+          <mat-label>Proveedor</mat-label>
+          <mat-select formControlName="providerId">
+            <mat-option value="">Todos</mat-option>
+            @for (provider of providers(); track provider.id) {
+              <mat-option [value]="provider.id">{{ provider.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Desde</mat-label>
           <input matInput type="date" formControlName="from" />
@@ -104,13 +113,14 @@ interface DayGroup {
                 @if (shift.endTime) {
                   <p class="time">{{ shift.startTime }} – {{ shift.endTime }}</p>
                   <p>
+                    {{ shift.provider.name }} ·
                     Alimentación {{ shift.mealBreakMinutes }} min ·
                     {{ shift.netMinutes | duration }} ·
                     {{ shift.earnedAmount | money }}
                   </p>
                 } @else {
                   <p class="time">{{ shift.startTime }} – en curso</p>
-                  <p>Ingreso abierto · aún no suma al total</p>
+                  <p>{{ shift.provider.name }} · Ingreso abierto · aún no suma al total</p>
                 }
               </div>
               <div class="segment-actions">
@@ -254,6 +264,7 @@ interface DayGroup {
 })
 export class HistoryComponent implements OnInit {
   readonly workers = signal<Worker[]>([]);
+  readonly providers = signal<Provider[]>([]);
   readonly shifts = signal<WorkShift[]>([]);
   readonly selectedWorkerId = signal<string | null>(null);
   readonly form;
@@ -297,6 +308,7 @@ export class HistoryComponent implements OnInit {
     private readonly route: ActivatedRoute,
   ) {
     this.form = fb.nonNullable.group({
+      providerId: [''],
       from: [''],
       to: [''],
       paymentStatus: [''],
@@ -304,6 +316,7 @@ export class HistoryComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    this.api.getProviders().subscribe((providers) => this.providers.set(providers));
     this.api.getWorkers().subscribe((workers) => {
       this.workers.set(workers);
       this.route.paramMap.subscribe((params) => {
@@ -327,6 +340,7 @@ export class HistoryComponent implements OnInit {
     this.api
       .getShifts({
         workerId,
+        providerId: value.providerId || undefined,
         from: value.from || undefined,
         to: value.to || undefined,
         paymentStatus: value.paymentStatus || undefined,
