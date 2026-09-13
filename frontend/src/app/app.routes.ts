@@ -31,6 +31,11 @@ export const routes: Routes = [
           import('./features/history/history.component').then((m) => m.HistoryComponent),
       },
       {
+        path: 'jornadas/:workerId',
+        loadComponent: () =>
+          import('./features/history/history.component').then((m) => m.HistoryComponent),
+      },
+      {
         path: 'liquidaciones',
         loadComponent: () =>
           import('./features/settlements/settlements.component').then((m) => m.SettlementsComponent),

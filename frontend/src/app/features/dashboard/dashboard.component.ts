@@ -28,19 +28,21 @@ import { MoneyPipe } from '../../shared/money.pipe';
 
       <h2>Trabajadoras activas</h2>
       @for (worker of data.workers; track worker.id) {
-        <mat-card class="worker">
-          <div>
-            <h3>{{ worker.name }}</h3>
-            <p>{{ worker.pendingShifts }} jornada(s) pendiente(s)</p>
-          </div>
-          <strong>{{ worker.pendingAmount | money }}</strong>
-        </mat-card>
+        <a class="worker-link" [routerLink]="['/jornadas', worker.id]">
+          <mat-card class="worker">
+            <div>
+              <h3>{{ worker.name }}</h3>
+              <p>{{ worker.pendingShifts }} registro(s) pendiente(s)</p>
+            </div>
+            <strong>{{ worker.pendingAmount | money }}</strong>
+          </mat-card>
+        </a>
       } @empty {
         <p class="empty">No hay trabajadoras activas. Agrégalas en Trabajadoras.</p>
       }
 
       <div class="actions">
-        <a mat-stroked-button routerLink="/jornadas">Ver historial</a>
+        <a mat-stroked-button routerLink="/jornadas">Historial por persona</a>
         <a mat-stroked-button routerLink="/liquidaciones">Liquidaciones</a>
       </div>
     } @else {
@@ -90,6 +92,11 @@ import { MoneyPipe } from '../../shared/money.pipe';
         align-items: center;
         padding: var(--space-md);
         margin-bottom: 10px;
+      }
+      .worker-link {
+        text-decoration: none;
+        color: inherit;
+        display: block;
       }
       .worker h3,
       .worker p {

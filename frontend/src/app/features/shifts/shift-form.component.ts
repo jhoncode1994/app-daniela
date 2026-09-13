@@ -5,7 +5,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -36,7 +36,10 @@ import { MoneyPipe } from '../../shared/money.pipe';
   ],
   template: `
     <h1>Registrar jornada</h1>
-    <p class="hint">Puedes agregar varios ingresos y salidas el mismo día. Cada uno suma al total.</p>
+    <p class="hint">
+      En una misma jornada (mismo día) puedes agregar varios ingresos y varias salidas.
+      Todo se suma al total de esa trabajadora.
+    </p>
 
     <form [formGroup]="form">
       <mat-form-field appearance="outline">
@@ -80,7 +83,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
 
       <button mat-stroked-button type="button" class="full" (click)="addSegment()">
         <mat-icon>add</mat-icon>
-        Agregar otro ingreso / salida
+        Agregar otro ingreso / salida a esta jornada
       </button>
 
       <button
@@ -90,13 +93,13 @@ import { MoneyPipe } from '../../shared/money.pipe';
         [disabled]="form.invalid || loading()"
         (click)="preview()"
       >
-        Calcular total del día
+        Calcular total de la jornada
       </button>
     </form>
 
     @if (previewResult(); as result) {
       <mat-card class="preview">
-        <h2>Revisa antes de guardar</h2>
+        <h2>Revisa la jornada antes de guardar</h2>
         @for (segment of result.segments; track $index) {
           <p>
             {{ segment.startTime }} – {{ segment.endTime }}:
@@ -108,7 +111,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
         <p>Alimentación: <strong>{{ result.totals.mealBreakMinutes | duration }}</strong></p>
         <p>Tiempo neto: <strong>{{ result.totals.netMinutes | duration }}</strong></p>
         <p>Valor hora: <strong>{{ result.totals.hourlyRate | money }}</strong></p>
-        <p>Total ganado: <strong>{{ result.totals.earnedAmount | money }}</strong></p>
+        <p>Total ganado en la jornada: <strong>{{ result.totals.earnedAmount | money }}</strong></p>
         <button
           mat-flat-button
           color="primary"
@@ -117,22 +120,21 @@ import { MoneyPipe } from '../../shared/money.pipe';
           [disabled]="saving()"
           (click)="save()"
         >
-          Guardar {{ result.segments.length }} registro(s)
+          Guardar jornada ({{ result.segments.length }} ingreso/salida)
         </button>
       </mat-card>
     }
 
     @if (dayShifts().length > 0) {
-      <h2>Ya registrados este día</h2>
+      <h2>Ya registrado en esta jornada</h2>
       @for (shift of dayShifts(); track shift.id) {
         <mat-card class="item">
           <p>{{ shift.startTime }} – {{ shift.endTime }}</p>
           <p>{{ shift.netMinutes | duration }} · {{ shift.earnedAmount | money }}</p>
         </mat-card>
       }
+      <a mat-button [routerLink]="['/jornadas', form.value.workerId]">Ver historial de esta trabajadora</a>
     }
-
-    <a mat-button routerLink="/jornadas">Ver historial</a>
   `,
   styles: [
     `
@@ -195,6 +197,7 @@ export class ShiftFormComponent implements OnInit {
     private readonly fb: FormBuilder,
     private readonly api: ApiService,
     private readonly snack: MatSnackBar,
+    private readonly route: ActivatedRoute,
   ) {
     this.form = this.fb.nonNullable.group({
       workerId: ['', Validators.required],
@@ -211,10 +214,13 @@ export class ShiftFormComponent implements OnInit {
     this.api.getWorkers().subscribe((workers) => {
       const active = workers.filter((worker) => worker.active);
       this.workers.set(active);
-      if (active.length === 1) {
+      const queryWorkerId = this.route.snapshot.queryParamMap.get('workerId');
+      if (queryWorkerId && active.some((worker) => worker.id === queryWorkerId)) {
+        this.form.patchValue({ workerId: queryWorkerId });
+      } else if (active.length === 1) {
         this.form.patchValue({ workerId: active[0].id });
-        this.reloadDayShifts();
       }
+      this.reloadDayShifts();
     });
   }
 
@@ -274,7 +280,9 @@ export class ShiftFormComponent implements OnInit {
     this.api.createBatchShifts(this.form.getRawValue()).subscribe({
       next: (created) => {
         this.saving.set(false);
-        this.snack.open(`${created.length} registro(s) guardados`, 'OK', { duration: 2500 });
+        this.snack.open(`Jornada guardada (${created.length} ingreso/salida)`, 'OK', {
+          duration: 2500,
+        });
         this.previewResult.set(null);
         while (this.segments.length > 1) {
           this.segments.removeAt(1);
