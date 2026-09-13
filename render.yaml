@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: app-daniela
+    runtime: node
+    plan: free
+    buildCommand: npm ci --prefix backend && npx --prefix backend prisma generate && npm --prefix backend run build && npm ci --prefix frontend && npm --prefix frontend run build
+    startCommand: cd backend && npx prisma migrate deploy && node dist/main.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ADMIN_USERNAME
+        value: admin
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: CORS_ORIGIN
+        sync: false

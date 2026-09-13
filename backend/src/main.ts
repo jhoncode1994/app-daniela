@@ -1,11 +1,14 @@
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { existsSync } from 'fs';
+import { join } from 'path';
 import { AppModule } from './app.module';
 import { AppExceptionFilter } from './common/http-exception.filter';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
   const origin = config.get<string>('CORS_ORIGIN', 'http://localhost:4200');
 
@@ -24,7 +27,16 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new AppExceptionFilter());
 
+  const frontendPath = join(__dirname, '..', '..', 'frontend', 'dist', 'frontend', 'browser');
+  if (existsSync(frontendPath)) {
+    app.useStaticAssets(frontendPath);
+    const expressApp = app.getHttpAdapter().getInstance();
+    expressApp.get(/^(?!\/api).*/, (_req, res) => {
+      res.sendFile(join(frontendPath, 'index.html'));
+    });
+  }
+
   const port = config.get<number>('PORT', 3000);
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
 }
 bootstrap();
