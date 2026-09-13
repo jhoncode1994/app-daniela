@@ -5,7 +5,7 @@
     "node": "22.x"
   },
   "scripts": {
-    "build": "npm install --prefix backend && npx --prefix backend prisma generate && npm --prefix backend run build && npm install --prefix frontend && npm --prefix frontend run build",
+    "build": "npm install --prefix backend && npm --prefix backend run prisma:generate && npm --prefix backend run build && npm install --prefix frontend && npm --prefix frontend run build",
     "start": "cd backend && npx prisma migrate deploy && node dist/main.js"
   }
 }
