@@ -32,7 +32,7 @@ model WorkShift {
   worker           Worker        @relation(fields: [workerId], references: [id])
   workDate         DateTime      @map("work_date") @db.Date
   startTime        String        @map("start_time") @db.VarChar(5)
-  endTime          String        @map("end_time") @db.VarChar(5)
+  endTime          String?       @map("end_time") @db.VarChar(5)
   mealBreakMinutes Int           @map("meal_break_minutes")
   grossMinutes     Int           @map("gross_minutes")
   netMinutes       Int           @map("net_minutes")

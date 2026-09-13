@@ -52,6 +52,18 @@ export class ApiService {
     return this.http.post<WorkShift[]>('/api/shifts/batch', data);
   }
 
+  clockIn(data: { workerId: string; workDate: string; startTime: string }) {
+    return this.http.post<WorkShift>('/api/shifts/clock-in', data);
+  }
+
+  clockOut(data: { workerId: string; endTime: string; mealBreakMinutes?: number }) {
+    return this.http.post<WorkShift>('/api/shifts/clock-out', data);
+  }
+
+  getOpenShift(workerId: string) {
+    return this.http.get<WorkShift | null>(`/api/shifts/open/${workerId}`);
+  }
+
   getShifts(filters: {
     workerId?: string;
     from?: string;

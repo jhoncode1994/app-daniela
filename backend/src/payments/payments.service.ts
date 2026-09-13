@@ -18,6 +18,7 @@ export class PaymentsService {
     const shifts = await this.prisma.workShift.findMany({
       where: {
         workerId: query.workerId,
+        endTime: { not: null },
         workDate: {
           gte: toDateOnly(query.from),
           lte: toDateOnly(query.to),

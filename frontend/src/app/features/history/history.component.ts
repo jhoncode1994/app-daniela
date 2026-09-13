@@ -101,17 +101,26 @@ interface DayGroup {
           @for (shift of day.shifts; track shift.id) {
             <div class="segment">
               <div>
-                <p class="time">{{ shift.startTime }} – {{ shift.endTime }}</p>
-                <p>
-                  Alimentación {{ shift.mealBreakMinutes }} min ·
-                  {{ shift.netMinutes | duration }} ·
-                  {{ shift.earnedAmount | money }}
-                </p>
+                @if (shift.endTime) {
+                  <p class="time">{{ shift.startTime }} – {{ shift.endTime }}</p>
+                  <p>
+                    Alimentación {{ shift.mealBreakMinutes }} min ·
+                    {{ shift.netMinutes | duration }} ·
+                    {{ shift.earnedAmount | money }}
+                  </p>
+                } @else {
+                  <p class="time">{{ shift.startTime }} – en curso</p>
+                  <p>Ingreso abierto · aún no suma al total</p>
+                }
               </div>
               <div class="segment-actions">
-                <mat-chip [class.paid]="shift.paymentStatus === 'PAGADA'">
-                  {{ shift.paymentStatus === 'PAGADA' ? 'Pagada' : 'Pendiente' }}
-                </mat-chip>
+                @if (shift.endTime) {
+                  <mat-chip [class.paid]="shift.paymentStatus === 'PAGADA'">
+                    {{ shift.paymentStatus === 'PAGADA' ? 'Pagada' : 'Pendiente' }}
+                  </mat-chip>
+                } @else {
+                  <mat-chip class="open-chip">En curso</mat-chip>
+                }
                 @if (shift.paymentStatus === 'PENDIENTE') {
                   <button mat-button color="warn" type="button" (click)="remove(shift)">Quitar</button>
                 }
@@ -236,6 +245,10 @@ interface DayGroup {
         background: var(--color-success-soft);
         color: var(--color-success);
       }
+      mat-chip.open-chip {
+        background: #fff1e8;
+        color: #9a5b2f;
+      }
     `,
   ],
 })
@@ -254,20 +267,23 @@ export class HistoryComponent implements OnInit {
     const map = new Map<string, DayGroup>();
     for (const shift of this.shifts()) {
       const existing = map.get(shift.workDate);
+      const countsTowardTotal = !!shift.endTime;
       if (existing) {
         existing.shifts.push(shift);
-        existing.netMinutes += shift.netMinutes;
-        existing.earnedAmount += shift.earnedAmount;
-        if (shift.paymentStatus === 'PENDIENTE') {
-          existing.pendingCount += 1;
+        if (countsTowardTotal) {
+          existing.netMinutes += shift.netMinutes;
+          existing.earnedAmount += shift.earnedAmount;
+          if (shift.paymentStatus === 'PENDIENTE') {
+            existing.pendingCount += 1;
+          }
         }
       } else {
         map.set(shift.workDate, {
           workDate: shift.workDate,
           shifts: [shift],
-          netMinutes: shift.netMinutes,
-          earnedAmount: shift.earnedAmount,
-          pendingCount: shift.paymentStatus === 'PENDIENTE' ? 1 : 0,
+          netMinutes: countsTowardTotal ? shift.netMinutes : 0,
+          earnedAmount: countsTowardTotal ? shift.earnedAmount : 0,
+          pendingCount: countsTowardTotal && shift.paymentStatus === 'PENDIENTE' ? 1 : 0,
         });
       }
     }

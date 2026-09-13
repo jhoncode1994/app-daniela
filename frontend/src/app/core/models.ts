@@ -13,13 +13,14 @@ export interface WorkShift {
   worker: { id: string; name: string };
   workDate: string;
   startTime: string;
-  endTime: string;
+  endTime: string | null;
   mealBreakMinutes: number;
   grossMinutes: number;
   netMinutes: number;
   hourlyRate: number;
   earnedAmount: number;
   paymentStatus: 'PENDIENTE' | 'PAGADA';
+  open?: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -10,6 +10,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { BatchShiftsDto } from './dto/batch-shifts.dto';
+import { ClockInDto } from './dto/clock-in.dto';
+import { ClockOutDto } from './dto/clock-out.dto';
 import { QueryShiftsDto } from './dto/query-shifts.dto';
 import { ShiftInputDto } from './dto/shift-input.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
@@ -27,6 +29,21 @@ export class ShiftsController {
   @Post('preview-batch')
   previewBatch(@Body() dto: BatchShiftsDto) {
     return this.shiftsService.previewBatch(dto);
+  }
+
+  @Post('clock-in')
+  clockIn(@Body() dto: ClockInDto) {
+    return this.shiftsService.clockIn(dto);
+  }
+
+  @Post('clock-out')
+  clockOut(@Body() dto: ClockOutDto) {
+    return this.shiftsService.clockOut(dto);
+  }
+
+  @Get('open/:workerId')
+  findOpen(@Param('workerId', ParseUUIDPipe) workerId: string) {
+    return this.shiftsService.findOpenForWorker(workerId);
   }
 
   @Post()

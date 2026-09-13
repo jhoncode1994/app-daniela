@@ -8,6 +8,8 @@ import { PaymentStatus, Prisma } from '@prisma/client';
 import { calculateShift, dateOnlyToString, toDateOnly } from '../common/time-money';
 import { PrismaService } from '../prisma/prisma.service';
 import { BatchShiftsDto } from './dto/batch-shifts.dto';
+import { ClockInDto } from './dto/clock-in.dto';
+import { ClockOutDto } from './dto/clock-out.dto';
 import { QueryShiftsDto } from './dto/query-shifts.dto';
 import { ShiftInputDto } from './dto/shift-input.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
@@ -83,6 +85,71 @@ export class ShiftsService {
       );
     }
     return created;
+  }
+
+  async clockIn(dto: ClockInDto) {
+    const worker = await this.requireActiveWorker(dto.workerId);
+    const open = await this.findOpenShift(worker.id);
+    if (open) {
+      throw new ConflictException(
+        `Ya hay un ingreso abierto a las ${open.startTime} (${dateOnlyToString(open.workDate)}). Registre la salida primero.`,
+      );
+    }
+
+    const shift = await this.prisma.workShift.create({
+      data: {
+        workerId: worker.id,
+        workDate: toDateOnly(dto.workDate),
+        startTime: dto.startTime,
+        endTime: null,
+        mealBreakMinutes: 0,
+        grossMinutes: 0,
+        netMinutes: 0,
+        hourlyRate: worker.hourlyRate,
+        earnedAmount: 0,
+        paymentStatus: PaymentStatus.PENDIENTE,
+      },
+      include: { worker: true },
+    });
+    return this.serialize(shift);
+  }
+
+  async clockOut(dto: ClockOutDto) {
+    const worker = await this.requireActiveWorker(dto.workerId);
+    const open = await this.findOpenShift(worker.id);
+    if (!open) {
+      throw new BadRequestException('No hay un ingreso abierto para esta trabajadora');
+    }
+    if (open.paymentStatus === PaymentStatus.PAGADA) {
+      throw new ConflictException('No se puede cerrar una jornada que ya fue pagada');
+    }
+
+    const mealBreakMinutes = dto.mealBreakMinutes ?? 0;
+    const calculation = calculateShift({
+      startTime: open.startTime,
+      endTime: dto.endTime,
+      mealBreakMinutes,
+      hourlyRate: open.hourlyRate,
+    });
+
+    const updated = await this.prisma.workShift.update({
+      where: { id: open.id },
+      data: {
+        endTime: dto.endTime,
+        mealBreakMinutes: calculation.mealBreakMinutes,
+        grossMinutes: calculation.grossMinutes,
+        netMinutes: calculation.netMinutes,
+        earnedAmount: calculation.earnedAmount,
+      },
+      include: { worker: true },
+    });
+    return this.serialize(updated);
+  }
+
+  async findOpenForWorker(workerId: string) {
+    await this.requireActiveWorker(workerId);
+    const open = await this.findOpenShift(workerId);
+    return open ? this.serialize({ ...open, worker: open.worker }) : null;
   }
 
   private async createForWorker(
@@ -161,9 +228,26 @@ export class ShiftsService {
     }
 
     const startTime = dto.startTime ?? shift.startTime;
-    const endTime = dto.endTime ?? shift.endTime;
+    const endTime = dto.endTime !== undefined ? dto.endTime : shift.endTime;
     const mealBreakMinutes = dto.mealBreakMinutes ?? shift.mealBreakMinutes;
     const workDate = dto.workDate ?? dateOnlyToString(shift.workDate);
+
+    if (!endTime) {
+      const updated = await this.prisma.workShift.update({
+        where: { id },
+        data: {
+          workDate: toDateOnly(workDate),
+          startTime,
+          endTime: null,
+          mealBreakMinutes: 0,
+          grossMinutes: 0,
+          netMinutes: 0,
+          earnedAmount: 0,
+        },
+        include: { worker: true },
+      });
+      return this.serialize(updated);
+    }
 
     const calculation = calculateShift({
       startTime,
@@ -200,6 +284,14 @@ export class ShiftsService {
     return { deleted: true };
   }
 
+  private async findOpenShift(workerId: string) {
+    return this.prisma.workShift.findFirst({
+      where: { workerId, endTime: null },
+      include: { worker: true },
+      orderBy: [{ workDate: 'asc' }, { startTime: 'asc' }, { createdAt: 'asc' }],
+    });
+  }
+
   private async requireActiveWorker(id: string) {
     const worker = await this.prisma.worker.findUnique({ where: { id } });
     if (!worker) {
@@ -216,7 +308,7 @@ export class ShiftsService {
     workerId: string;
     workDate: Date;
     startTime: string;
-    endTime: string;
+    endTime: string | null;
     mealBreakMinutes: number;
     grossMinutes: number;
     netMinutes: number;
@@ -230,6 +322,7 @@ export class ShiftsService {
     return {
       ...shift,
       workDate: dateOnlyToString(shift.workDate),
+      open: shift.endTime === null,
     };
   }
 }

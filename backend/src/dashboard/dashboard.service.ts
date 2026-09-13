@@ -15,18 +15,18 @@ export class DashboardService {
           select: {
             paymentStatus: true,
             earnedAmount: true,
+            endTime: true,
           },
         },
       },
     });
 
     const items = workers.map((worker) => {
-      const pendingAmount = worker.workShifts
-        .filter((shift) => shift.paymentStatus === PaymentStatus.PENDIENTE)
-        .reduce((sum, shift) => sum + shift.earnedAmount, 0);
-      const pendingShifts = worker.workShifts.filter(
-        (shift) => shift.paymentStatus === PaymentStatus.PENDIENTE,
-      ).length;
+      const closedPending = worker.workShifts.filter(
+        (shift) => shift.paymentStatus === PaymentStatus.PENDIENTE && shift.endTime !== null,
+      );
+      const pendingAmount = closedPending.reduce((sum, shift) => sum + shift.earnedAmount, 0);
+      const pendingShifts = closedPending.length;
       return {
         id: worker.id,
         name: worker.name,
