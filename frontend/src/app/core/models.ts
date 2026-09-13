@@ -44,6 +44,39 @@ export interface ShiftInput {
   mealBreakMinutes: number;
 }
 
+export interface ShiftSegmentInput {
+  startTime: string;
+  endTime: string;
+  mealBreakMinutes: number;
+}
+
+export interface BatchShiftsInput {
+  workerId: string;
+  workDate: string;
+  segments: ShiftSegmentInput[];
+}
+
+export interface BatchShiftPreview {
+  worker: { id: string; name: string };
+  workDate: string;
+  segments: {
+    startTime: string;
+    endTime: string;
+    mealBreakMinutes: number;
+    grossMinutes: number;
+    netMinutes: number;
+    hourlyRate: number;
+    earnedAmount: number;
+  }[];
+  totals: {
+    grossMinutes: number;
+    mealBreakMinutes: number;
+    netMinutes: number;
+    hourlyRate: number;
+    earnedAmount: number;
+  };
+}
+
 export interface DashboardSummary {
   workers: {
     id: string;

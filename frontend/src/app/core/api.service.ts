@@ -1,6 +1,8 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import {
+  BatchShiftPreview,
+  BatchShiftsInput,
   DashboardSummary,
   PaymentRecord,
   SettlementPreview,
@@ -38,8 +40,16 @@ export class ApiService {
     return this.http.post<ShiftPreview>('/api/shifts/preview', data);
   }
 
+  previewBatchShifts(data: BatchShiftsInput) {
+    return this.http.post<BatchShiftPreview>('/api/shifts/preview-batch', data);
+  }
+
   createShift(data: ShiftInput) {
     return this.http.post<WorkShift>('/api/shifts', data);
+  }
+
+  createBatchShifts(data: BatchShiftsInput) {
+    return this.http.post<WorkShift[]>('/api/shifts/batch', data);
   }
 
   getShifts(filters: {

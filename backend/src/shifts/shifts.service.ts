@@ -7,6 +7,7 @@ import {
 import { PaymentStatus, Prisma } from '@prisma/client';
 import { calculateShift, dateOnlyToString, toDateOnly } from '../common/time-money';
 import { PrismaService } from '../prisma/prisma.service';
+import { BatchShiftsDto } from './dto/batch-shifts.dto';
 import { QueryShiftsDto } from './dto/query-shifts.dto';
 import { ShiftInputDto } from './dto/shift-input.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
@@ -32,8 +33,62 @@ export class ShiftsService {
     };
   }
 
+  async previewBatch(dto: BatchShiftsDto) {
+    const worker = await this.requireActiveWorker(dto.workerId);
+    const segments = dto.segments.map((segment) => {
+      const calculation = calculateShift({
+        startTime: segment.startTime,
+        endTime: segment.endTime,
+        mealBreakMinutes: segment.mealBreakMinutes,
+        hourlyRate: worker.hourlyRate,
+      });
+      return {
+        startTime: segment.startTime,
+        endTime: segment.endTime,
+        ...calculation,
+      };
+    });
+
+    return {
+      worker: { id: worker.id, name: worker.name },
+      workDate: dto.workDate,
+      segments,
+      totals: {
+        grossMinutes: segments.reduce((sum, item) => sum + item.grossMinutes, 0),
+        mealBreakMinutes: segments.reduce((sum, item) => sum + item.mealBreakMinutes, 0),
+        netMinutes: segments.reduce((sum, item) => sum + item.netMinutes, 0),
+        hourlyRate: worker.hourlyRate,
+        earnedAmount: segments.reduce((sum, item) => sum + item.earnedAmount, 0),
+      },
+    };
+  }
+
   async create(dto: ShiftInputDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
+    return this.createForWorker(worker, dto);
+  }
+
+  async createBatch(dto: BatchShiftsDto) {
+    const worker = await this.requireActiveWorker(dto.workerId);
+    const created: Awaited<ReturnType<ShiftsService['createForWorker']>>[] = [];
+    for (const segment of dto.segments) {
+      created.push(
+        await this.createForWorker(worker, {
+          workerId: dto.workerId,
+          workDate: dto.workDate,
+          startTime: segment.startTime,
+          endTime: segment.endTime,
+          mealBreakMinutes: segment.mealBreakMinutes,
+        }),
+      );
+    }
+    return created;
+  }
+
+  private async createForWorker(
+    worker: { id: string; name: string; hourlyRate: number },
+    dto: ShiftInputDto,
+  ) {
     const calculation = calculateShift({
       startTime: dto.startTime,
       endTime: dto.endTime,

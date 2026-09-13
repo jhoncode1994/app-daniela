@@ -9,6 +9,7 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
+import { BatchShiftsDto } from './dto/batch-shifts.dto';
 import { QueryShiftsDto } from './dto/query-shifts.dto';
 import { ShiftInputDto } from './dto/shift-input.dto';
 import { UpdateShiftDto } from './dto/update-shift.dto';
@@ -23,9 +24,19 @@ export class ShiftsController {
     return this.shiftsService.preview(dto);
   }
 
+  @Post('preview-batch')
+  previewBatch(@Body() dto: BatchShiftsDto) {
+    return this.shiftsService.previewBatch(dto);
+  }
+
   @Post()
   create(@Body() dto: ShiftInputDto) {
     return this.shiftsService.create(dto);
+  }
+
+  @Post('batch')
+  createBatch(@Body() dto: BatchShiftsDto) {
+    return this.shiftsService.createBatch(dto);
   }
 
   @Get()
