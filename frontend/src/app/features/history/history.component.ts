@@ -38,23 +38,29 @@ interface DayGroup {
     MoneyPipe,
   ],
   template: `
+    <div class="page-enter">
     @if (!selectedWorker()) {
+      <p class="eyebrow">Por persona</p>
       <h1>Historial</h1>
-      <p class="hint">Elige una trabajadora para ver su historial.</p>
+      <p class="hint">Elige una trabajadora para ver solo su historial.</p>
       @for (worker of workers(); track worker.id) {
         <a class="worker-link" [routerLink]="['/jornadas', worker.id]">
           <mat-card class="worker-card">
-            <h3>{{ worker.name }}</h3>
-            <p>{{ worker.hourlyRate | money }} / hora</p>
+            <div class="avatar" aria-hidden="true">{{ worker.name.charAt(0) }}</div>
+            <div>
+              <h3>{{ worker.name }}</h3>
+              <p>{{ worker.hourlyRate | money }} / hora</p>
+            </div>
           </mat-card>
         </a>
       } @empty {
         <p class="empty">No hay trabajadoras. Agrégalas primero.</p>
       }
     } @else {
-      <a mat-button routerLink="/jornadas">Volver a trabajadoras</a>
+      <a mat-button routerLink="/jornadas" class="back">Volver a trabajadoras</a>
+      <p class="eyebrow">Historial</p>
       <h1>{{ selectedWorker()!.name }}</h1>
-      <p class="hint">Historial solo de esta trabajadora. Cada día puede tener varios ingresos y salidas.</p>
+      <p class="hint">Cada día puede tener varios ingresos y salidas.</p>
 
       <form [formGroup]="form" (ngSubmit)="load()">
         <mat-form-field appearance="outline">
@@ -91,11 +97,11 @@ interface DayGroup {
             <h3>{{ day.workDate }}</h3>
             <strong>{{ day.earnedAmount | money }}</strong>
           </div>
-          <p>Total neto del día: {{ day.netMinutes | duration }}</p>
+          <p class="day-total">Total neto del día: {{ day.netMinutes | duration }}</p>
           @for (shift of day.shifts; track shift.id) {
             <div class="segment">
               <div>
-                <p>{{ shift.startTime }} – {{ shift.endTime }}</p>
+                <p class="time">{{ shift.startTime }} – {{ shift.endTime }}</p>
                 <p>
                   Alimentación {{ shift.mealBreakMinutes }} min ·
                   {{ shift.netMinutes | duration }} ·
@@ -117,12 +123,25 @@ interface DayGroup {
         <p class="empty">No hay registros para esta trabajadora con esos filtros.</p>
       }
     }
+    </div>
   `,
   styles: [
     `
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--color-primary);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
       .hint,
-      .empty {
+      .empty,
+      .day-total {
         color: var(--color-muted-foreground);
+      }
+      .back {
+        margin: 0 0 8px -8px;
       }
       .worker-link {
         text-decoration: none;
@@ -130,7 +149,23 @@ interface DayGroup {
         display: block;
         margin-bottom: 10px;
       }
-      .worker-card,
+      .worker-card {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: var(--space-md);
+      }
+      .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        background: var(--color-muted);
+        color: var(--color-primary);
+        font-weight: 700;
+        flex-shrink: 0;
+      }
       .day {
         padding: var(--space-md);
         margin-bottom: 12px;
@@ -140,13 +175,19 @@ interface DayGroup {
       .segment p {
         margin: 0 0 4px;
       }
-      .worker-card p {
+      .worker-card p,
+      .segment p:not(.time) {
         margin: 0;
         color: var(--color-muted-foreground);
+      }
+      .time {
+        color: var(--color-foreground) !important;
+        font-weight: 600;
       }
       form {
         display: flex;
         flex-direction: column;
+        gap: 4px;
       }
       .full {
         width: 100%;
@@ -159,6 +200,10 @@ interface DayGroup {
         gap: 8px;
         align-items: center;
       }
+      .day-head strong {
+        color: var(--color-primary);
+        font-size: 1.05rem;
+      }
       .segment {
         display: flex;
         flex-direction: column;
@@ -166,9 +211,6 @@ interface DayGroup {
         padding-top: 10px;
         margin-top: 10px;
         border-top: 1px solid var(--color-border);
-      }
-      .segment p {
-        color: var(--color-muted-foreground);
       }
       .segment-actions {
         display: flex;

@@ -13,10 +13,10 @@ import { httpErrorMessage } from '../../core/http-error';
   imports: [ReactiveFormsModule, MatCardModule, MatFormFieldModule, MatInputModule, MatButtonModule],
   template: `
     <div class="wrap">
-      <mat-card>
+      <mat-card class="page-enter">
         <p class="eyebrow">Bienvenida</p>
         <h1>Control de jornadas</h1>
-        <p class="lead">Entra para registrar horas y pagos.</p>
+        <p class="lead">Entra para registrar horas y pagos de forma sencilla.</p>
         <form [formGroup]="form" (ngSubmit)="submit()">
           <mat-form-field appearance="outline">
             <mat-label>Usuario</mat-label>
@@ -43,25 +43,25 @@ import { httpErrorMessage } from '../../core/http-error';
         display: grid;
         place-items: center;
         padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
-        background: var(--color-background);
       }
       mat-card {
         width: min(420px, 100%);
-        padding: clamp(16px, 4vw, 24px);
+        padding: clamp(20px, 5vw, 28px);
+        box-shadow: var(--shadow-md) !important;
       }
       .eyebrow {
         margin: 0 0 6px;
         color: var(--color-primary);
-        font-size: 0.85rem;
-        font-weight: 600;
-        letter-spacing: 0.04em;
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
       }
       h1 {
         margin: 0 0 8px;
       }
       .lead {
-        margin: 0 0 20px;
+        margin: 0 0 22px;
         color: var(--color-muted-foreground);
       }
       form {
@@ -71,7 +71,7 @@ import { httpErrorMessage } from '../../core/http-error';
       }
       .full {
         width: 100%;
-        min-height: var(--touch);
+        min-height: 52px;
         margin-top: 8px;
       }
       .error {

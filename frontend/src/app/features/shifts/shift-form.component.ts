@@ -35,6 +35,8 @@ import { MoneyPipe } from '../../shared/money.pipe';
     MoneyPipe,
   ],
   template: `
+    <div class="page-enter">
+    <p class="eyebrow">Nueva entrada</p>
     <h1>Registrar jornada</h1>
     <p class="hint">
       En una misma jornada (mismo día) puedes agregar varios ingresos y varias salidas.
@@ -135,12 +137,21 @@ import { MoneyPipe } from '../../shared/money.pipe';
       }
       <a mat-button [routerLink]="['/jornadas', form.value.workerId]">Ver historial de esta trabajadora</a>
     }
+    </div>
   `,
   styles: [
     `
       .hint {
         margin: 0 0 16px;
         color: var(--color-muted-foreground);
+      }
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--color-primary);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
       }
       form,
       .preview,

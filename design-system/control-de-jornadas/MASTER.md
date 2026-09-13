@@ -82,27 +82,26 @@
 ```css
 /* Primary Button */
 .btn-primary {
-  background: #EA580C;
+  background: #A56B74;
   color: white;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: 14px;
   font-weight: 600;
   transition: all 200ms ease;
   cursor: pointer;
 }
 
 .btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+  opacity: 0.94;
 }
 
 /* Secondary Button */
 .btn-secondary {
   background: transparent;
-  color: #0D9488;
-  border: 2px solid #0D9488;
+  color: #A56B74;
+  border: 1px solid #E8D8D6;
   padding: 12px 24px;
-  border-radius: 8px;
+  border-radius: 14px;
   font-weight: 600;
   transition: all 200ms ease;
   cursor: pointer;
@@ -113,53 +112,37 @@
 
 ```css
 .card {
-  background: #F0FDFA;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
+  background: #FFFFFF;
+  border-radius: 20px;
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid #E8D8D6;
   transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
 }
 ```
+
+### Mobile notes
+
+- Bottom nav with max 4 items
+- Touch targets >= 48px
+- Soft feminine palette without loud pink
+- Per-worker history
 
 ### Inputs
 
 ```css
 .input {
   padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
+  border: 1px solid #E8D8D6;
+  border-radius: 14px;
   font-size: 16px;
   transition: border-color 200ms ease;
 }
 
 .input:focus {
-  border-color: #0D9488;
+  border-color: #A56B74;
   outline: none;
-  box-shadow: 0 0 0 3px #0D948820;
-}
-```
-
-### Modals
-
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
+  box-shadow: 0 0 0 3px rgba(165, 107, 116, 0.18);
 }
 ```
 
@@ -167,37 +150,41 @@
 
 ## Style Guidelines
 
-**Style:** Minimalism & Swiss Style
+**Style:** Soft feminine utility (dusty rose + cream)
 
-**Keywords:** Clean, simple, spacious, functional, white space, high contrast, geometric, sans-serif, grid-based, essential
+**Keywords:** Warm, calm, mobile-first, clear hierarchy, tactile cards, soft shadows
 
-**Best For:** Enterprise apps, dashboards, documentation sites, SaaS platforms, professional tools
+**Best For:** Small-team time tracking, settlement tools, daily admin on phone
 
-**Key Effects:** Subtle hover (200-250ms), smooth transitions, sharp shadows if any, clear type hierarchy, fast loading
+**Key Effects:** Page enter fade (220ms), button press scale, sticky blur chrome, soft card elevation
 
 ### Page Pattern
 
-**Pattern Name:** Product Demo + Features
+**Pattern Name:** Mobile utility shell
 
-- **Conversion Strategy:** Use an interactive demo only when it explains value better than static media. Provide captions, transcript, visible play/pause controls, and a non-video fallback; do not autoplay under reduced motion. Pause media when offscreen or hidden and keep the final product state available as static content.
-- **CTA Placement:** Video center + CTA right/bottom
-- **Section Order:** Hero > Product video/mockup (center) > Feature breakdown per section > Comparison (optional) > CTA
+- Bottom navigation for primary tasks
+- One job per screen
+- History scoped per worker
+- Large money/time totals as primary signals
 
 ---
 
 ## Motion
 
-**Scroll Reveal** (Subtle) — Trigger: scroll (viewport enter) | Duration: 300-400ms | Easing: `power1.out`
+**Page enter** (Subtle) — Duration: 220ms | Easing: ease-out
 
-```js
-gsap.from(el, { opacity: 0, y: 12, duration: 0.35, ease: 'power1.out', scrollTrigger: { trigger: el, start: 'top 90%', toggleActions: 'play none none reverse' } });
+```css
+.page-enter {
+  animation: page-enter 220ms ease-out;
+}
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
+}
 ```
-
-**Framework notes:** Requires the ScrollTrigger plugin registered once via gsap.registerPlugin(ScrollTrigger); Use matchMedia('(prefers-reduced-motion: reduce)') to skip non-essential motion and render the final state immediately
-
-- ✅ Keep the y offset small (8-16px) so it reads as a fade, not a slide
-- ❌ Don't reveal below-the-fold content needed for SEO/crawlers as invisible-by-default without a no-JS fallback
-- ⚡ toggleActions 'play none none reverse' avoids re-triggering on every scroll direction change
 
 ---
 

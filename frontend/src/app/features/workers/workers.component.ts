@@ -24,58 +24,125 @@ import { MoneyPipe } from '../../shared/money.pipe';
     MoneyPipe,
   ],
   template: `
-    <h1>Trabajadoras</h1>
-    <mat-card class="form-card">
-      <h2>{{ editingId() ? 'Editar' : 'Nueva trabajadora' }}</h2>
-      <form [formGroup]="form" (ngSubmit)="save()">
-        <mat-form-field appearance="outline">
-          <mat-label>Nombre</mat-label>
-          <input matInput formControlName="name" />
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Valor de la hora</mat-label>
-          <input matInput type="number" formControlName="hourlyRate" />
-        </mat-form-field>
-        <mat-slide-toggle formControlName="active">Activa</mat-slide-toggle>
-        <div class="row">
-          <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid">
-            Guardar
-          </button>
-          @if (editingId()) {
-            <button mat-button type="button" (click)="cancel()">Cancelar</button>
-          }
-        </div>
-      </form>
-    </mat-card>
+    <div class="page-enter">
+      <p class="eyebrow">Equipo</p>
+      <h1>Trabajadoras</h1>
+      <p class="hint">Define nombre, valor/hora y si están activas.</p>
 
-    @for (worker of workers(); track worker.id) {
-      <mat-card class="item">
-        <div>
-          <h3>{{ worker.name }}</h3>
-          <p>
-            {{ worker.hourlyRate | money }} / hora ·
-            {{ worker.active ? 'Activa' : 'Inactiva' }}
-          </p>
-        </div>
-        <div class="row">
-          <button mat-button type="button" (click)="edit(worker)">Editar</button>
-          <button mat-button type="button" (click)="toggle(worker)">
-            {{ worker.active ? 'Desactivar' : 'Activar' }}
-          </button>
-        </div>
+      <mat-card class="form-card">
+        <h2>{{ editingId() ? 'Editar' : 'Nueva trabajadora' }}</h2>
+        <form [formGroup]="form" (ngSubmit)="save()">
+          <mat-form-field appearance="outline">
+            <mat-label>Nombre</mat-label>
+            <input matInput formControlName="name" autocomplete="name" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Valor de la hora</mat-label>
+            <input matInput type="number" formControlName="hourlyRate" inputmode="numeric" />
+          </mat-form-field>
+          <mat-slide-toggle formControlName="active">Activa</mat-slide-toggle>
+          <div class="row">
+            <button mat-flat-button color="primary" type="submit" [disabled]="form.invalid">
+              Guardar
+            </button>
+            @if (editingId()) {
+              <button mat-button type="button" (click)="cancel()">Cancelar</button>
+            }
+          </div>
+        </form>
       </mat-card>
-    }
+
+      @for (worker of workers(); track worker.id) {
+        <mat-card class="item">
+          <div class="identity">
+            <div class="avatar" aria-hidden="true">{{ worker.name.charAt(0) }}</div>
+            <div>
+              <h3>{{ worker.name }}</h3>
+              <p>
+                {{ worker.hourlyRate | money }} / hora ·
+                <span [class.off]="!worker.active">{{ worker.active ? 'Activa' : 'Inactiva' }}</span>
+              </p>
+            </div>
+          </div>
+          <div class="row">
+            <button mat-button type="button" (click)="edit(worker)">Editar</button>
+            <button mat-button type="button" (click)="toggle(worker)">
+              {{ worker.active ? 'Desactivar' : 'Activar' }}
+            </button>
+          </div>
+        </mat-card>
+      }
+    </div>
   `,
   styles: [
     `
-      .form-card, .item { padding: var(--space-md); margin-bottom: 12px; }
-      form { display: flex; flex-direction: column; gap: var(--space-sm); }
-      .item { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; }
-      h2 { margin: 0 0 12px; }
-      h3, p { margin: 0; }
-      p { color: var(--color-muted-foreground); }
-      .row { display: flex; gap: var(--space-sm); }
-      button { min-height: 44px; }
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--color-primary);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      .hint {
+        margin: -4px 0 18px;
+        color: var(--color-muted-foreground);
+      }
+      .form-card,
+      .item {
+        padding: var(--space-md);
+        margin-bottom: 12px;
+      }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: var(--space-sm);
+      }
+      .item {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .identity {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        min-width: 0;
+      }
+      .avatar {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        background: var(--color-muted);
+        color: var(--color-primary);
+        font-weight: 700;
+        flex-shrink: 0;
+      }
+      h2 {
+        margin: 0 0 12px;
+      }
+      h3,
+      p {
+        margin: 0;
+      }
+      p {
+        color: var(--color-muted-foreground);
+      }
+      .off {
+        color: var(--color-destructive);
+      }
+      .row {
+        display: flex;
+        gap: var(--space-sm);
+        flex-wrap: wrap;
+      }
+      button {
+        min-height: var(--touch);
+      }
     `,
   ],
 })

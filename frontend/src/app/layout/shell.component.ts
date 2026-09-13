@@ -53,16 +53,18 @@ import { AuthService } from '../core/auth.service';
         position: sticky;
         top: 0;
         z-index: 20;
-        background: var(--color-card) !important;
+        background: rgba(255, 255, 255, 0.92) !important;
         color: var(--color-foreground) !important;
         border-bottom: 1px solid var(--color-border);
         padding-top: env(safe-area-inset-top);
         min-height: 56px;
+        backdrop-filter: blur(12px);
       }
       .title {
-        font-weight: 700;
+        font-weight: 800;
         color: var(--color-primary);
-        font-size: 1.1rem;
+        font-size: 1.15rem;
+        letter-spacing: -0.02em;
       }
       .spacer {
         flex: 1;
@@ -82,10 +84,12 @@ import { AuthService } from '../core/auth.service';
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 4px;
-        background: var(--color-card);
+        background: rgba(255, 255, 255, 0.94);
         border-top: 1px solid var(--color-border);
         padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
         z-index: 30;
+        backdrop-filter: blur(12px);
+        box-shadow: 0 -6px 20px rgba(63, 51, 53, 0.04);
       }
       .bottom-nav a {
         display: flex;
