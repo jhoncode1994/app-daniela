@@ -22,6 +22,14 @@ interface DayGroup {
   pendingCount: number;
 }
 
+interface ProviderDebt {
+  providerId: string;
+  providerName: string;
+  pendingAmount: number;
+  pendingMinutes: number;
+  shiftCount: number;
+}
+
 @Component({
   selector: 'app-history',
   imports: [
@@ -60,7 +68,9 @@ interface DayGroup {
       <a mat-button routerLink="/jornadas" class="back">Volver a trabajadoras</a>
       <p class="eyebrow">Historial</p>
       <h1>{{ selectedWorker()!.name }}</h1>
-      <p class="hint">Cada día puede tener varios ingresos y salidas. Filtra por proveedor si quieres.</p>
+      <p class="hint">
+        Filtra por proveedor para ver solo Alma Rosa o solo Bizcocho de esta trabajadora.
+      </p>
 
       <form [formGroup]="form" (ngSubmit)="load()">
         <mat-form-field appearance="outline">
@@ -100,6 +110,39 @@ interface DayGroup {
         Registrar jornada
       </a>
 
+      <section class="debts">
+        <h2>Pendiente por proveedor</h2>
+        @if (providerDebts().length > 0) {
+          <div class="debt-grid">
+            @for (debt of providerDebts(); track debt.providerId) {
+              <mat-card class="debt-card">
+                <span class="debt-label">{{ debt.providerName }}</span>
+                <strong>{{ debt.pendingAmount | money }}</strong>
+                <p>{{ debt.pendingMinutes | duration }} · {{ debt.shiftCount }} registro(s)</p>
+                <a
+                  mat-button
+                  color="primary"
+                  [routerLink]="['/liquidaciones']"
+                  [queryParams]="{
+                    workerId: selectedWorker()!.id,
+                    providerId: debt.providerId
+                  }"
+                >
+                  Liquidar
+                </a>
+              </mat-card>
+            }
+          </div>
+          <mat-card class="debt-total">
+            <span>Total adeudado</span>
+            <strong>{{ totalPending() | money }}</strong>
+          </mat-card>
+        } @else {
+          <p class="empty">No hay montos pendientes con ningún proveedor.</p>
+        }
+      </section>
+
+      <h2>Registros</h2>
       @for (day of dayGroups(); track day.workDate) {
         <mat-card class="day">
           <div class="day-head">
@@ -259,6 +302,66 @@ interface DayGroup {
         background: #fff1e8;
         color: #9a5b2f;
       }
+      .debts {
+        margin: 8px 0 20px;
+      }
+      .debts h2,
+      h2 {
+        margin: 8px 0 12px;
+        font-size: 1.05rem;
+      }
+      .debt-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
+      @media (min-width: 520px) {
+        .debt-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+      }
+      .debt-card,
+      .debt-total {
+        padding: var(--space-md);
+      }
+      .debt-card {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        background: linear-gradient(180deg, #fff8f7 0%, #ffffff 100%);
+        border-color: rgba(165, 107, 116, 0.28);
+      }
+      .debt-label {
+        color: var(--color-primary);
+        font-size: 0.8rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .debt-card strong,
+      .debt-total strong {
+        color: var(--color-primary);
+        font-size: 1.25rem;
+      }
+      .debt-card p {
+        margin: 0;
+        color: var(--color-muted-foreground);
+      }
+      .debt-card a {
+        align-self: flex-start;
+        margin: 4px 0 0 -8px;
+        min-height: 40px;
+      }
+      .debt-total {
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .debt-total span {
+        font-weight: 600;
+      }
     `,
   ],
 })
@@ -266,6 +369,7 @@ export class HistoryComponent implements OnInit {
   readonly workers = signal<Worker[]>([]);
   readonly providers = signal<Provider[]>([]);
   readonly shifts = signal<WorkShift[]>([]);
+  readonly pendingShifts = signal<WorkShift[]>([]);
   readonly selectedWorkerId = signal<string | null>(null);
   readonly form;
 
@@ -273,6 +377,34 @@ export class HistoryComponent implements OnInit {
     const id = this.selectedWorkerId();
     return this.workers().find((worker) => worker.id === id) ?? null;
   });
+
+  readonly providerDebts = computed(() => {
+    const map = new Map<string, ProviderDebt>();
+    for (const shift of this.pendingShifts()) {
+      if (!shift.endTime || shift.paymentStatus !== 'PENDIENTE') {
+        continue;
+      }
+      const existing = map.get(shift.providerId);
+      if (existing) {
+        existing.pendingAmount += shift.earnedAmount;
+        existing.pendingMinutes += shift.netMinutes;
+        existing.shiftCount += 1;
+      } else {
+        map.set(shift.providerId, {
+          providerId: shift.providerId,
+          providerName: shift.provider.name,
+          pendingAmount: shift.earnedAmount,
+          pendingMinutes: shift.netMinutes,
+          shiftCount: 1,
+        });
+      }
+    }
+    return [...map.values()].sort((a, b) => a.providerName.localeCompare(b.providerName, 'es'));
+  });
+
+  readonly totalPending = computed(() =>
+    this.providerDebts().reduce((sum, debt) => sum + debt.pendingAmount, 0),
+  );
 
   readonly dayGroups = computed(() => {
     const map = new Map<string, DayGroup>();
@@ -324,8 +456,10 @@ export class HistoryComponent implements OnInit {
         this.selectedWorkerId.set(workerId);
         if (workerId) {
           this.load();
+          this.loadPendingDebts();
         } else {
           this.shifts.set([]);
+          this.pendingShifts.set([]);
         }
       });
     });
@@ -348,6 +482,18 @@ export class HistoryComponent implements OnInit {
       .subscribe((shifts) => this.shifts.set(shifts));
   }
 
+  loadPendingDebts(): void {
+    const workerId = this.selectedWorkerId();
+    if (!workerId) {
+      this.pendingShifts.set([]);
+      return;
+    }
+    this.api.getShifts({ workerId, paymentStatus: 'PENDIENTE' }).subscribe({
+      next: (shifts) => this.pendingShifts.set(shifts),
+      error: () => this.pendingShifts.set([]),
+    });
+  }
+
   remove(shift: WorkShift): void {
     if (!window.confirm('¿Eliminar este ingreso/salida pendiente?')) {
       return;
@@ -356,6 +502,7 @@ export class HistoryComponent implements OnInit {
       next: () => {
         this.snack.open('Registro eliminado', 'OK', { duration: 2500 });
         this.load();
+        this.loadPendingDebts();
       },
       error: (err) => this.snack.open(httpErrorMessage(err), 'OK', { duration: 4000 }),
     });
