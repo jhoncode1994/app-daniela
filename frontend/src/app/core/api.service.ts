@@ -107,6 +107,13 @@ export class ApiService {
     return this.http.get<WorkShift[]>('/api/shifts', { params });
   }
 
+  updateShift(
+    id: string,
+    data: { workDate?: string; startTime?: string; endTime?: string; mealBreakMinutes?: number },
+  ) {
+    return this.http.patch<WorkShift>(`/api/shifts/${id}`, data);
+  }
+
   deleteShift(id: string) {
     return this.http.delete(`/api/shifts/${id}`);
   }
@@ -125,6 +132,10 @@ export class ApiService {
     paymentDate?: string;
   }) {
     return this.http.post<PaymentRecord>('/api/payments', data);
+  }
+
+  deletePayment(id: string) {
+    return this.http.delete<{ deleted: boolean; restoredShifts: number }>(`/api/payments/${id}`);
   }
 
   getPayments(filters?: { workerId?: string; providerId?: string }) {

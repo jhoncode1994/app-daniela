@@ -28,13 +28,57 @@
   --page-pad: 16px;
   --bottom-nav-space: 104px;
   --transition: 200ms ease;
+  --tint: #fff8f7;
+  --tint-success: #f4faf6;
+  --glass: rgba(255, 255, 255, 0.92);
+  --color-primary-line: rgba(165, 107, 116, 0.3);
+  --color-success-line: rgba(61, 107, 79, 0.2);
+  --warn: #9a5b2f;
+  --warn-soft: #fff1e8;
+  --bg-a: #fbf7f5;
+  --bg-b: #f7f3f1;
+  --bg-c: #f3ebe8;
+  --bg-glow: rgba(165, 107, 116, 0.08);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-primary: #d9a0a9;
+    --color-on-primary: #2a1a1d;
+    --color-secondary: #c4a49a;
+    --color-background: #1c1718;
+    --color-background-soft: #211b1c;
+    --color-foreground: #f3e9e7;
+    --color-card: #2a2224;
+    --color-muted: #3a2f31;
+    --color-muted-foreground: #c9b8ba;
+    --color-border: #4a3c3f;
+    --color-destructive: #f2b8b5;
+    --color-success: #8fd1a8;
+    --color-success-soft: #1f3a2a;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+    --tint: #33272a;
+    --tint-success: #223429;
+    --glass: rgba(42, 34, 36, 0.92);
+    --color-primary-line: rgba(217, 160, 169, 0.35);
+    --color-success-line: rgba(143, 209, 168, 0.3);
+    --warn: #f0b98a;
+    --warn-soft: #3d2c20;
+    --bg-a: #211b1c;
+    --bg-b: #1c1718;
+    --bg-c: #171213;
+    --bg-glow: rgba(217, 160, 169, 0.08);
+    color-scheme: dark;
+  }
 }
 
 html {
   @include mat.theme(
     (
       color: (
-        theme-type: light,
+        theme-type: color-scheme,
         primary: mat.$rose-palette,
         tertiary: mat.$red-palette,
       ),
@@ -72,8 +116,8 @@ body {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top left, rgba(165, 107, 116, 0.08), transparent 32%),
-    linear-gradient(180deg, var(--color-background-soft) 0%, var(--color-background) 48%, #f3ebe8 100%);
+    radial-gradient(circle at top left, var(--bg-glow), transparent 32%),
+    linear-gradient(180deg, var(--bg-a) 0%, var(--bg-b) 48%, var(--bg-c) 100%);
   background-attachment: fixed;
   color: var(--color-foreground);
   font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
@@ -142,7 +186,7 @@ a.mat-mdc-button {
 }
 
 .mat-mdc-card {
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--glass);
   border-radius: var(--radius) !important;
   box-shadow: var(--shadow-sm) !important;
   border: 1px solid var(--color-border);
@@ -160,6 +204,28 @@ select,
 textarea,
 .mat-mdc-input-element {
   font-size: 16px !important;
+}
+
+.skeleton {
+  display: block;
+  min-height: 20px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(90deg, var(--color-muted) 25%, var(--color-border) 50%, var(--color-muted) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+.page-enter > form {
+  max-width: 560px;
 }
 
 .page-enter {
@@ -182,6 +248,12 @@ textarea,
   outline-offset: 2px;
 }
 
+@media (min-width: 960px) {
+  :root {
+    --content-max: 960px;
+  }
+}
+
 @media (min-width: 768px) {
   :root {
     --page-pad: 24px;
@@ -202,6 +274,10 @@ textarea,
   }
 
   .page-enter {
+    animation: none;
+  }
+
+  .skeleton {
     animation: none;
   }
 }

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, HostListener, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -17,6 +17,13 @@ import { AuthService } from '../core/auth.service';
         <a mat-button class="desktop-only" routerLink="/proveedores">Proveedores</a>
         <button mat-button type="button" (click)="auth.logout()">Salir</button>
       </mat-toolbar>
+
+      @if (offline()) {
+        <div class="offline" role="status">
+          <mat-icon aria-hidden="true">cloud_off</mat-icon>
+          Sin conexión. Puedes ver lo cargado, pero no guardar cambios hasta que vuelva internet.
+        </div>
+      }
 
       <main id="contenido" class="content">
         <router-outlet />
@@ -54,12 +61,22 @@ import { AuthService } from '../core/auth.service';
         position: sticky;
         top: 0;
         z-index: 20;
-        background: rgba(255, 255, 255, 0.92) !important;
+        background: var(--glass) !important;
         color: var(--color-foreground) !important;
         border-bottom: 1px solid var(--color-border);
         padding-top: env(safe-area-inset-top);
         min-height: 56px;
         backdrop-filter: blur(12px);
+      }
+      .offline {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px var(--page-pad);
+        background: var(--warn-soft);
+        color: var(--warn);
+        font-size: 0.9rem;
+        font-weight: 600;
       }
       .title {
         font-weight: 800;
@@ -85,7 +102,7 @@ import { AuthService } from '../core/auth.service';
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 4px;
-        background: rgba(255, 255, 255, 0.94);
+        background: var(--glass);
         border-top: 1px solid var(--color-border);
         padding: 8px 6px calc(8px + env(safe-area-inset-bottom));
         z-index: 30;
@@ -126,5 +143,17 @@ import { AuthService } from '../core/auth.service';
   ],
 })
 export class ShellComponent {
+  readonly offline = signal(typeof navigator !== 'undefined' && !navigator.onLine);
+
   constructor(readonly auth: AuthService) {}
+
+  @HostListener('window:offline')
+  onOffline(): void {
+    this.offline.set(true);
+  }
+
+  @HostListener('window:online')
+  onOnline(): void {
+    this.offline.set(false);
+  }
 }

@@ -17,7 +17,9 @@ function dayLabel(date: string): string {
   return `${WEEKDAYS[new Date(y, m - 1, d).getDay()]} ${date}`;
 }
 
-export async function downloadPaymentPdf(payment: PaymentRecord): Promise<void> {
+const BUSINESS_NAME = 'Control de jornadas';
+
+async function buildPaymentPdf(payment: PaymentRecord): Promise<{ doc: import('jspdf').jsPDF; filename: string }> {
   const [{ jsPDF }, { default: autoTable }] = await Promise.all([
     import('jspdf'),
     import('jspdf-autotable'),
@@ -30,6 +32,9 @@ export async function downloadPaymentPdf(payment: PaymentRecord): Promise<void> 
   doc.setFontSize(20);
   doc.setTextColor(...primary);
   doc.text('Comprobante de pago', margin, 50);
+  doc.setFontSize(10);
+  doc.setTextColor(120, 120, 120);
+  doc.text(BUSINESS_NAME, margin, 64);
 
   doc.setFontSize(11);
   doc.setTextColor(60, 60, 60);
@@ -84,14 +89,54 @@ export async function downloadPaymentPdf(payment: PaymentRecord): Promise<void> 
     showFoot: 'lastPage',
   });
 
-  const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+  let finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
+  if (finalY + 150 > doc.internal.pageSize.getHeight()) {
+    doc.addPage();
+    finalY = 20;
+  }
   doc.setFontSize(14);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(...primary);
   doc.text(`TOTAL PAGADO: ${money(payment.amount)}`, margin, finalY + 34);
 
+  const signY = finalY + 110;
+  doc.setDrawColor(120, 120, 120);
+  doc.setLineWidth(0.5);
+  doc.line(margin, signY, margin + 200, signY);
+  doc.line(margin + 260, signY, margin + 400, signY);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(90, 90, 90);
+  doc.text(`Firma de recibido · ${payment.worker.name}`, margin, signY + 14);
+  doc.text('Fecha', margin + 260, signY + 14);
+
   const safe = (text: string) => text.normalize('NFD').replace(/[^\w-]+/g, '_');
-  doc.save(
-    `pago_${safe(payment.worker.name)}_${safe(payment.provider?.name ?? 'general')}_${payment.paymentDate}.pdf`,
-  );
+  return {
+    doc,
+    filename: `pago_${safe(payment.worker.name)}_${safe(payment.provider?.name ?? 'general')}_${payment.paymentDate}.pdf`,
+  };
+}
+
+export async function downloadPaymentPdf(payment: PaymentRecord): Promise<void> {
+  const { doc, filename } = await buildPaymentPdf(payment);
+  doc.save(filename);
+}
+
+/** Comparte el PDF (WhatsApp u otra app) si el dispositivo lo permite; si no, lo descarga. */
+export async function sharePaymentPdf(payment: PaymentRecord): Promise<void> {
+  const { doc, filename } = await buildPaymentPdf(payment);
+  const file = new File([doc.output('blob')], filename, { type: 'application/pdf' });
+  const text = `Pago a ${payment.worker.name}${payment.provider ? ` (${payment.provider.name})` : ''} del ${payment.paymentDate}: ${money(payment.amount)}`;
+  if (navigator.canShare?.({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: 'Comprobante de pago', text });
+    } catch (err) {
+      if ((err as DOMException).name !== 'AbortError') {
+        throw err;
+      }
+    }
+    return;
+  }
+  doc.save(filename);
+  window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }

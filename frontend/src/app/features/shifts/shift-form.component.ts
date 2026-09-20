@@ -174,8 +174,8 @@ import { MoneyPipe } from '../../shared/money.pipe';
         margin-bottom: 12px;
       }
       .open-card {
-        border-color: rgba(165, 107, 116, 0.35);
-        background: linear-gradient(180deg, #fff8f7 0%, #ffffff 100%);
+        border-color: var(--color-primary-line);
+        background: linear-gradient(180deg, var(--tint) 0%, var(--color-card) 100%);
       }
       .open-card h2 {
         margin: 4px 0 8px;

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { SettlementQueryDto } from './dto/settlement-query.dto';
 import { PaymentsService } from './payments.service';
@@ -15,6 +15,11 @@ export class PaymentsController {
   @Post('payments')
   create(@Body() dto: CreatePaymentDto) {
     return this.paymentsService.create(dto);
+  }
+
+  @Delete('payments/:id')
+  remove(@Param('id', ParseUUIDPipe) id: string) {
+    return this.paymentsService.remove(id);
   }
 
   @Get('payments')

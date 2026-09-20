@@ -13,8 +13,9 @@ import { httpErrorMessage } from '../../core/http-error';
 import { PaymentRecord, Provider, SettlementPreview, Worker } from '../../core/models';
 import { DurationPipe } from '../../shared/duration.pipe';
 import { MoneyPipe } from '../../shared/money.pipe';
+import { ConfirmDialogComponent } from '../../shared/confirm.dialog';
 import { ConfirmPaymentDialogComponent } from './confirm-payment.dialog';
-import { downloadPaymentPdf } from '../../shared/payment-pdf';
+import { downloadPaymentPdf, sharePaymentPdf } from '../../shared/payment-pdf';
 
 @Component({
   selector: 'app-settlements',
@@ -120,16 +121,31 @@ import { downloadPaymentPdf } from '../../shared/payment-pdf';
       <h2>Pagos anteriores@if (paymentsScope()) { · {{ paymentsScope() }} }</h2>
       @for (payment of payments(); track payment.id) {
         <mat-card class="item">
-          <div>
-            <h3>{{ payment.worker.name }}@if (payment.provider) { · {{ payment.provider.name }} }</h3>
-            <p>{{ payment.paymentDate }} · {{ payment.shiftCount }} jornada(s)</p>
-          </div>
-          <div class="amount">
+          <div class="item-head">
+            <div>
+              <h3>{{ payment.worker.name }}@if (payment.provider) { · {{ payment.provider.name }} }</h3>
+              <p>{{ payment.paymentDate }} · {{ payment.shiftCount }} jornada(s)</p>
+            </div>
             <strong>{{ payment.amount | money }}</strong>
+          </div>
+          <details class="detail">
+            <summary>Ver detalle por día</summary>
+            <ul>
+              @for (shift of payment.shifts; track shift.id) {
+                <li>
+                  <span>{{ shift.workDate }} · {{ shift.startTime }}–{{ shift.endTime }} · {{ shift.netMinutes | duration }}</span>
+                  <strong>{{ shift.earnedAmount | money }}</strong>
+                </li>
+              }
+            </ul>
+          </details>
+          <div class="item-actions">
             <button mat-stroked-button type="button" (click)="downloadPdf(payment)">Descargar PDF</button>
+            <button mat-stroked-button type="button" (click)="sharePdf(payment)">Compartir</button>
+            <button mat-button color="warn" type="button" (click)="cancelPayment(payment)">Anular pago</button>
           </div>
         </mat-card>
-      } @empty {
+              } @empty {
         <p class="empty">Aún no hay pagos registrados para esta selección.</p>
       }
     </div>
@@ -193,8 +209,8 @@ import { downloadPaymentPdf } from '../../shared/payment-pdf';
         grid-column: 1 / -1;
         padding: 12px;
         border-radius: var(--radius-sm);
-        background: linear-gradient(180deg, #fff8f7 0%, #ffffff 100%);
-        border: 1px solid rgba(165, 107, 116, 0.28);
+        background: linear-gradient(180deg, var(--tint) 0%, var(--color-card) 100%);
+        border: 1px solid var(--color-primary-line);
       }
       .pending strong {
         color: var(--color-primary);
@@ -212,7 +228,7 @@ import { downloadPaymentPdf } from '../../shared/payment-pdf';
         padding: 10px 12px 10px 16px;
         border-radius: var(--radius);
         background: var(--color-card);
-        border: 1px solid rgba(165, 107, 116, 0.35);
+        border: 1px solid var(--color-primary-line);
         box-shadow: var(--shadow-md);
       }
       .pay-info {
@@ -236,18 +252,46 @@ import { downloadPaymentPdf } from '../../shared/payment-pdf';
       }
       .item {
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
+        flex-direction: column;
+        gap: 4px;
       }
       .item strong {
         color: var(--color-success);
       }
-      .amount {
+      .item-head {
         display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 6px;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+      }
+      .item-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .detail {
+        margin: 4px 0;
+      }
+      .detail summary {
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        color: var(--color-primary);
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .detail ul {
+        margin: 0 0 8px;
+        padding: 0;
+        list-style: none;
+      }
+      .detail li {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 6px 0;
+        border-top: 1px solid var(--color-border);
+        font-size: 0.9rem;
       }
       p {
         margin: 6px 0;
@@ -372,6 +416,41 @@ export class SettlementsComponent implements OnInit {
         this.snack.open(httpErrorMessage(err), 'OK', { duration: 4000 });
       },
     });
+  }
+
+  cancelPayment(payment: PaymentRecord): void {
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        width: 'min(420px, 92vw)',
+        data: {
+          title: 'Anular pago',
+          message: `Se anulará el pago de ${payment.worker.name} del ${payment.paymentDate} y sus ${payment.shiftCount} jornada(s) volverán a quedar pendientes. Úsalo solo si el pago se registró por error.`,
+          confirmLabel: 'Anular pago',
+          destructive: true,
+        },
+      })
+      .afterClosed()
+      .subscribe((confirmed) => {
+        if (!confirmed) {
+          return;
+        }
+        this.api.deletePayment(payment.id).subscribe({
+          next: () => {
+            this.snack.open('Pago anulado; las jornadas quedaron pendientes', 'OK', { duration: 3500 });
+            this.reloadPayments();
+            if (this.settlement()) {
+              this.preview();
+            }
+          },
+          error: (err) => this.snack.open(httpErrorMessage(err), 'OK', { duration: 4000 }),
+        });
+      });
+  }
+
+  sharePdf(payment: PaymentRecord): void {
+    sharePaymentPdf(payment).catch(() =>
+      this.snack.open('No se pudo compartir el PDF', 'OK', { duration: 4000 }),
+    );
   }
 
   downloadPdf(payment: PaymentRecord): void {

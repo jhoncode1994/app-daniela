@@ -34,6 +34,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
         </section>
 
         <h2>Trabajadoras activas</h2>
+        <div class="workers">
         @for (worker of data.workers; track worker.id) {
           <mat-card class="worker">
             <a class="worker-main" [routerLink]="['/jornadas', worker.id]">
@@ -72,13 +73,19 @@ import { MoneyPipe } from '../../shared/money.pipe';
           <p class="empty">No hay trabajadoras activas.</p>
           <a mat-flat-button color="primary" routerLink="/trabajadoras">Agregar trabajadora</a>
         }
+        </div>
 
         <nav class="manage" aria-label="Administrar">
           <a mat-button routerLink="/trabajadoras">Administrar trabajadoras</a>
           <a mat-button routerLink="/proveedores">Administrar proveedores</a>
         </nav>
       } @else {
-        <p class="empty">Cargando resumen…</p>
+        <section class="totals" aria-busy="true" aria-label="Cargando resumen">
+          <span class="skeleton" style="height: 84px"></span>
+          <span class="skeleton" style="height: 84px"></span>
+        </section>
+        <span class="skeleton" style="height: 120px; margin-top: 24px"></span>
+        <span class="skeleton" style="height: 120px; margin-top: 10px"></span>
       }
     </div>
   `,
@@ -109,19 +116,19 @@ import { MoneyPipe } from '../../shared/money.pipe';
         gap: 12px;
       }
       .stat {
-        background: rgba(255, 255, 255, 0.9);
+        background: var(--glass);
         border: 1px solid var(--color-border);
         border-radius: var(--radius);
         padding: 16px;
         box-shadow: var(--shadow-sm);
       }
       .stat.pending {
-        border-color: rgba(165, 107, 116, 0.28);
-        background: linear-gradient(180deg, #fff8f7 0%, #ffffff 100%);
+        border-color: var(--color-primary-line);
+        background: linear-gradient(180deg, var(--tint) 0%, var(--color-card) 100%);
       }
       .stat.paid {
-        border-color: rgba(61, 107, 79, 0.2);
-        background: linear-gradient(180deg, #f4faf6 0%, #ffffff 100%);
+        border-color: var(--color-success-line);
+        background: linear-gradient(180deg, var(--tint-success) 0%, var(--color-card) 100%);
       }
       .stat span,
       .worker p,
@@ -181,6 +188,17 @@ import { MoneyPipe } from '../../shared/money.pipe';
       .meta h3,
       .meta p {
         margin: 0;
+      }
+      @media (min-width: 720px) {
+        .workers {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 12px;
+          align-items: start;
+        }
+        .worker {
+          margin-bottom: 0;
+        }
       }
       .manage {
         display: flex;

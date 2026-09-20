@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
@@ -11,6 +12,7 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/api.service';
 import { httpErrorMessage } from '../../core/http-error';
 import { WorkShift, Worker, Provider } from '../../core/models';
+import { EditShiftDialogComponent } from './edit-shift.dialog';
 import { DurationPipe } from '../../shared/duration.pipe';
 import { MoneyPipe } from '../../shared/money.pipe';
 
@@ -46,6 +48,7 @@ function formatLocalDate(date: Date): string {
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
+    MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -55,7 +58,11 @@ function formatLocalDate(date: Date): string {
   ],
   template: `
     <div class="page-enter">
-    @if (!selectedWorker()) {
+    @if (loadingWorkers()) {
+      <span class="skeleton" style="height: 28px; width: 40%; margin-bottom: 16px"></span>
+      <span class="skeleton" style="height: 72px; margin-bottom: 10px"></span>
+      <span class="skeleton" style="height: 72px"></span>
+    } @else if (!selectedWorker()) {
       <p class="eyebrow">Por persona</p>
       <h1>Historial</h1>
       <p class="hint">Elige una trabajadora para ver solo su historial.</p>
@@ -70,7 +77,8 @@ function formatLocalDate(date: Date): string {
           </mat-card>
         </a>
       } @empty {
-        <p class="empty">No hay trabajadoras. Agrégalas primero.</p>
+        <p class="empty">Todavía no hay trabajadoras.</p>
+        <a mat-flat-button color="primary" routerLink="/trabajadoras">Agregar trabajadora</a>
       }
     } @else {
       <a mat-button routerLink="/jornadas" class="back">Volver a trabajadoras</a>
@@ -196,14 +204,24 @@ function formatLocalDate(date: Date): string {
                   <mat-chip class="open-chip">En curso</mat-chip>
                 }
                 @if (shift.paymentStatus === 'PENDIENTE') {
-                  <button mat-button color="warn" type="button" (click)="remove(shift)">Quitar</button>
+                  <div class="row-buttons">
+                    <button mat-button type="button" (click)="edit(shift)">Editar</button>
+                    <button mat-button color="warn" type="button" (click)="remove(shift)">Quitar</button>
+                  </div>
                 }
               </div>
             </div>
           }
         </mat-card>
       } @empty {
-        <p class="empty">No hay registros para esta trabajadora con esos filtros.</p>
+        <p class="empty">No hay registros con estos filtros.</p>
+        <a
+          mat-stroked-button
+          [routerLink]="['/jornadas/nueva']"
+          [queryParams]="{ workerId: selectedWorker()!.id }"
+        >
+          Registrar la primera jornada
+        </a>
       }
     }
     </div>
@@ -342,6 +360,10 @@ function formatLocalDate(date: Date): string {
         margin-top: 10px;
         border-top: 1px solid var(--color-border);
       }
+      .row-buttons {
+        display: flex;
+        gap: 4px;
+      }
       .segment-actions {
         display: flex;
         flex-wrap: wrap;
@@ -367,8 +389,8 @@ function formatLocalDate(date: Date): string {
         color: var(--color-success);
       }
       mat-chip.open-chip {
-        background: #fff1e8;
-        color: #9a5b2f;
+        background: var(--warn-soft);
+        color: var(--warn);
       }
       .debts {
         margin: 8px 0 20px;
@@ -388,6 +410,11 @@ function formatLocalDate(date: Date): string {
           grid-template-columns: 1fr 1fr;
         }
       }
+      @media (min-width: 960px) {
+        .debt-grid {
+          grid-template-columns: repeat(3, 1fr);
+        }
+      }
       .debt-card,
       .debt-total {
         padding: var(--space-md);
@@ -396,8 +423,8 @@ function formatLocalDate(date: Date): string {
         display: flex;
         flex-direction: column;
         gap: 4px;
-        background: linear-gradient(180deg, #fff8f7 0%, #ffffff 100%);
-        border-color: rgba(165, 107, 116, 0.28);
+        background: linear-gradient(180deg, var(--tint) 0%, var(--color-card) 100%);
+        border-color: var(--color-primary-line);
       }
       .debt-label {
         color: var(--color-primary);
@@ -438,6 +465,7 @@ export class HistoryComponent implements OnInit {
   readonly providers = signal<Provider[]>([]);
   readonly shifts = signal<WorkShift[]>([]);
   readonly pendingShifts = signal<WorkShift[]>([]);
+  readonly loadingWorkers = signal(true);
   readonly selectedWorkerId = signal<string | null>(null);
   readonly quick = signal<QuickFilter | null>('all');
   readonly quickOptions: { id: QuickFilter; label: string }[] = [
@@ -513,6 +541,7 @@ export class HistoryComponent implements OnInit {
     private readonly api: ApiService,
     private readonly snack: MatSnackBar,
     private readonly route: ActivatedRoute,
+    private readonly dialog: MatDialog,
   ) {
     this.form = fb.nonNullable.group({
       providerId: [''],
@@ -526,6 +555,7 @@ export class HistoryComponent implements OnInit {
     this.api.getProviders().subscribe((providers) => this.providers.set(providers));
     this.api.getWorkers().subscribe((workers) => {
       this.workers.set(workers);
+      this.loadingWorkers.set(false);
       this.route.paramMap.subscribe((params) => {
         const workerId = params.get('workerId');
         this.selectedWorkerId.set(workerId);
@@ -591,6 +621,25 @@ export class HistoryComponent implements OnInit {
       next: (shifts) => this.pendingShifts.set(shifts),
       error: () => this.pendingShifts.set([]),
     });
+  }
+
+  edit(shift: WorkShift): void {
+    this.dialog
+      .open(EditShiftDialogComponent, { width: 'min(420px, 92vw)', data: shift })
+      .afterClosed()
+      .subscribe((changes) => {
+        if (!changes) {
+          return;
+        }
+        this.api.updateShift(shift.id, changes).subscribe({
+          next: () => {
+            this.snack.open('Registro corregido', 'OK', { duration: 2500 });
+            this.load();
+            this.loadPendingDebts();
+          },
+          error: (err) => this.snack.open(httpErrorMessage(err), 'OK', { duration: 4000 }),
+        });
+      });
   }
 
   remove(shift: WorkShift): void {

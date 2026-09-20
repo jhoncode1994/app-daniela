@@ -136,6 +136,24 @@ export class PaymentsService {
     return payments.map((payment) => this.serializePayment(payment));
   }
 
+  async remove(id: string) {
+    const payment = await this.prisma.payment.findUnique({
+      where: { id },
+      include: { paymentShifts: true },
+    });
+    if (!payment) {
+      throw new NotFoundException('Pago no encontrado');
+    }
+    await this.prisma.$transaction([
+      this.prisma.workShift.updateMany({
+        where: { id: { in: payment.paymentShifts.map((item) => item.shiftId) } },
+        data: { paymentStatus: PaymentStatus.PENDIENTE },
+      }),
+      this.prisma.payment.delete({ where: { id } }),
+    ]);
+    return { deleted: true, restoredShifts: payment.paymentShifts.length };
+  }
+
   private async requireWorker(id: string) {
     const worker = await this.prisma.worker.findUnique({ where: { id } });
     if (!worker) {
