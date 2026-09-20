@@ -32,8 +32,8 @@ import { MoneyPipe } from '../../shared/money.pipe';
       <p class="eyebrow">Fichaje</p>
       <h1>Registrar jornada</h1>
       <p class="hint">
-        Elige trabajadora y proveedor (ej. Alma Rosa o Bizcocho). Registra ingreso o salida por separado;
-        el valor se calcula al cerrar cada tramo.
+        Recordamos tu última trabajadora y proveedor. La fecha y la hora ya vienen de hoy; toca
+        "Ahora" para actualizar la hora.
       </p>
 
       <form [formGroup]="form">
@@ -72,6 +72,9 @@ import { MoneyPipe } from '../../shared/money.pipe';
               <mat-label>Hora de salida</mat-label>
               <input matInput type="time" formControlName="endTime" />
             </mat-form-field>
+            <button mat-stroked-button class="now" type="button" (click)="setNow(outForm.controls.endTime)">
+              Ahora
+            </button>
             <mat-form-field appearance="outline">
               <mat-label>Alimentación (minutos)</mat-label>
               <input matInput type="number" formControlName="mealBreakMinutes" />
@@ -96,6 +99,9 @@ import { MoneyPipe } from '../../shared/money.pipe';
               <mat-label>Hora de ingreso</mat-label>
               <input matInput type="time" formControlName="startTime" />
             </mat-form-field>
+            <button mat-stroked-button class="now" type="button" (click)="setNow(inForm.controls.startTime)">
+              Ahora
+            </button>
             <button
               mat-flat-button
               color="primary"
@@ -188,6 +194,10 @@ import { MoneyPipe } from '../../shared/money.pipe';
       .item.open {
         border-style: dashed;
       }
+      .now {
+        align-self: flex-start;
+        margin-bottom: 8px;
+      }
       .full {
         width: 100%;
         min-height: var(--touch);
@@ -226,10 +236,10 @@ export class ShiftFormComponent implements OnInit {
       workDate: [todayLocal(), Validators.required],
     });
     this.inForm = this.fb.nonNullable.group({
-      startTime: ['', Validators.required],
+      startTime: [nowLocal(), Validators.required],
     });
     this.outForm = this.fb.nonNullable.group({
-      endTime: ['', Validators.required],
+      endTime: [nowLocal(), Validators.required],
       mealBreakMinutes: [0, [Validators.required, Validators.min(0)]],
     });
   }
@@ -243,6 +253,11 @@ export class ShiftFormComponent implements OnInit {
         this.form.patchValue({ workerId: queryWorkerId });
       } else if (active.length === 1) {
         this.form.patchValue({ workerId: active[0].id });
+      } else {
+        const saved = readSaved(LAST_WORKER_KEY);
+        if (saved && active.some((worker) => worker.id === saved)) {
+          this.form.patchValue({ workerId: saved });
+        }
       }
       this.reload();
     });
@@ -255,13 +270,28 @@ export class ShiftFormComponent implements OnInit {
         this.form.patchValue({ providerId: queryProviderId });
       } else if (active.length === 1) {
         this.form.patchValue({ providerId: active[0].id });
+      } else {
+        const saved = readSaved(LAST_PROVIDER_KEY);
+        if (saved && active.some((provider) => provider.id === saved)) {
+          this.form.patchValue({ providerId: saved });
+        }
       }
       this.reload();
     });
   }
 
+  setNow(control: { setValue(value: string): void }): void {
+    control.setValue(nowLocal());
+  }
+
   reload(): void {
     const { workerId, providerId, workDate } = this.form.getRawValue();
+    if (workerId) {
+      writeSaved(LAST_WORKER_KEY, workerId);
+    }
+    if (providerId) {
+      writeSaved(LAST_PROVIDER_KEY, providerId);
+    }
     if (!workerId || !workDate) {
       this.dayShifts.set([]);
       this.openShift.set(null);
@@ -303,7 +333,7 @@ export class ShiftFormComponent implements OnInit {
         next: () => {
           this.saving.set(false);
           this.snack.open('Ingreso registrado', 'OK', { duration: 2500 });
-          this.inForm.reset({ startTime: '' });
+          this.inForm.reset({ startTime: nowLocal() });
           this.reload();
         },
         error: (err) => {
@@ -328,7 +358,7 @@ export class ShiftFormComponent implements OnInit {
           'OK',
           { duration: 3500 },
         );
-        this.outForm.reset({ endTime: '', mealBreakMinutes: 0 });
+        this.outForm.reset({ endTime: nowLocal(), mealBreakMinutes: 0 });
         this.reload();
       },
       error: (err) => {
@@ -343,4 +373,28 @@ function todayLocal(): string {
   const now = new Date();
   const offset = now.getTimezoneOffset();
   return new Date(now.getTime() - offset * 60_000).toISOString().slice(0, 10);
+}
+
+const LAST_WORKER_KEY = 'jornadas.lastWorkerId';
+const LAST_PROVIDER_KEY = 'jornadas.lastProviderId';
+
+function nowLocal(): string {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
+function readSaved(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeSaved(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Sin almacenamiento disponible: la app funciona igual.
+  }
 }

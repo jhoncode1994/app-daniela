@@ -14,7 +14,7 @@ import { MoneyPipe } from '../../shared/money.pipe';
     <div class="page-enter">
       <p class="eyebrow">Resumen</p>
       <h1>Inicio</h1>
-      <p class="lead">Registra horas rápido y revisa lo pendiente de pago.</p>
+      <p class="lead">Registra horas rápido y liquida lo pendiente de cada trabajadora.</p>
 
       <a mat-flat-button color="primary" class="cta" routerLink="/jornadas/nueva">
         <mat-icon>add_circle</mat-icon>
@@ -35,26 +35,48 @@ import { MoneyPipe } from '../../shared/money.pipe';
 
         <h2>Trabajadoras activas</h2>
         @for (worker of data.workers; track worker.id) {
-          <a class="worker-link" [routerLink]="['/jornadas', worker.id]">
-            <mat-card class="worker">
+          <mat-card class="worker">
+            <a class="worker-main" [routerLink]="['/jornadas', worker.id]">
               <div class="avatar" aria-hidden="true">{{ worker.name.charAt(0) }}</div>
               <div class="meta">
                 <h3>{{ worker.name }}</h3>
-                <p>{{ worker.pendingShifts }} registro(s) pendiente(s)</p>
+                <p>
+                  @if (worker.pendingShifts > 0) {
+                    {{ worker.pendingShifts }} registro(s) pendiente(s)
+                  } @else {
+                    Al día, sin pendientes
+                  }
+                </p>
               </div>
-              <strong>{{ worker.pendingAmount | money }}</strong>
-            </mat-card>
-          </a>
+              <strong [class.zero]="worker.pendingAmount === 0">{{ worker.pendingAmount | money }}</strong>
+            </a>
+            <div class="worker-actions">
+              <a mat-stroked-button [routerLink]="['/jornadas/nueva']" [queryParams]="{ workerId: worker.id }">
+                <mat-icon>add</mat-icon>
+                Registrar
+              </a>
+              @if (worker.pendingAmount > 0) {
+                <a
+                  mat-flat-button
+                  color="primary"
+                  [routerLink]="['/liquidaciones']"
+                  [queryParams]="{ workerId: worker.id }"
+                >
+                  <mat-icon>payments</mat-icon>
+                  Liquidar
+                </a>
+              }
+            </div>
+          </mat-card>
         } @empty {
-          <p class="empty">No hay trabajadoras activas. Agrégalas en Trabajadoras.</p>
+          <p class="empty">No hay trabajadoras activas.</p>
+          <a mat-flat-button color="primary" routerLink="/trabajadoras">Agregar trabajadora</a>
         }
 
-        <div class="actions">
-          <a mat-stroked-button routerLink="/trabajadoras">Trabajadoras</a>
-          <a mat-stroked-button routerLink="/proveedores">Proveedores</a>
-          <a mat-stroked-button routerLink="/jornadas">Historial</a>
-          <a mat-stroked-button routerLink="/liquidaciones">Liquidaciones</a>
-        </div>
+        <nav class="manage" aria-label="Administrar">
+          <a mat-button routerLink="/trabajadoras">Administrar trabajadoras</a>
+          <a mat-button routerLink="/proveedores">Administrar proveedores</a>
+        </nav>
       } @else {
         <p class="empty">Cargando resumen…</p>
       }
@@ -114,18 +136,37 @@ import { MoneyPipe } from '../../shared/money.pipe';
         margin-top: 6px;
         color: var(--color-foreground);
       }
-      .worker-link {
-        text-decoration: none;
-        color: inherit;
-        display: block;
-        margin-bottom: 10px;
-      }
       .worker {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-bottom: 10px;
+        padding: 14px 16px;
+      }
+      .worker-main {
         display: grid;
         grid-template-columns: auto 1fr auto;
         gap: 12px;
         align-items: center;
-        padding: 14px 16px;
+        text-decoration: none;
+        color: inherit;
+        min-height: var(--touch);
+      }
+      .worker-main strong {
+        color: var(--color-primary);
+      }
+      .worker-main strong.zero {
+        color: var(--color-muted-foreground);
+      }
+      .worker-actions {
+        display: flex;
+        gap: 8px;
+      }
+      .worker-actions a {
+        flex: 1;
+        min-height: var(--touch);
+        display: inline-flex;
+        gap: 4px;
       }
       .avatar {
         width: 42px;
@@ -141,20 +182,12 @@ import { MoneyPipe } from '../../shared/money.pipe';
       .meta p {
         margin: 0;
       }
-      .actions {
-        display: grid;
-        grid-template-columns: 1fr;
-        gap: 10px;
-        margin-top: 20px;
-      }
-      .actions a {
-        min-height: var(--touch);
-        width: 100%;
-      }
-      @media (min-width: 480px) {
-        .actions {
-          grid-template-columns: 1fr 1fr 1fr;
-        }
+      .manage {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px 12px;
+        margin-top: 12px;
       }
       @media (max-width: 360px) {
         .totals {

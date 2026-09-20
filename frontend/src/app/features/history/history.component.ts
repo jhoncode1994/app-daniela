@@ -30,6 +30,14 @@ interface ProviderDebt {
   shiftCount: number;
 }
 
+type QuickFilter = 'all' | 'pending' | 'week' | 'month';
+
+function formatLocalDate(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 @Component({
   selector: 'app-history',
   imports: [
@@ -68,38 +76,51 @@ interface ProviderDebt {
       <a mat-button routerLink="/jornadas" class="back">Volver a trabajadoras</a>
       <p class="eyebrow">Historial</p>
       <h1>{{ selectedWorker()!.name }}</h1>
-      <p class="hint">
-        Filtra por proveedor para ver solo Alma Rosa o solo Bizcocho de esta trabajadora.
-      </p>
+      <div class="quick" role="group" aria-label="Filtros rápidos">
+        @for (option of quickOptions; track option.id) {
+          <button
+            type="button"
+            class="quick-chip"
+            [class.active]="quick() === option.id"
+            [attr.aria-pressed]="quick() === option.id"
+            (click)="applyQuick(option.id)"
+          >
+            {{ option.label }}
+          </button>
+        }
+      </div>
 
-      <form [formGroup]="form" (ngSubmit)="load()">
-        <mat-form-field appearance="outline">
-          <mat-label>Proveedor</mat-label>
-          <mat-select formControlName="providerId">
-            <mat-option value="">Todos</mat-option>
-            @for (provider of providers(); track provider.id) {
-              <mat-option [value]="provider.id">{{ provider.name }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Desde</mat-label>
-          <input matInput type="date" formControlName="from" />
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Hasta</mat-label>
-          <input matInput type="date" formControlName="to" />
-        </mat-form-field>
-        <mat-form-field appearance="outline">
-          <mat-label>Estado de pago</mat-label>
-          <mat-select formControlName="paymentStatus">
-            <mat-option value="">Todos</mat-option>
-            <mat-option value="PENDIENTE">Pendiente</mat-option>
-            <mat-option value="PAGADA">Pagada</mat-option>
-          </mat-select>
-        </mat-form-field>
-        <button mat-flat-button color="primary" type="submit" class="full">Filtrar</button>
-      </form>
+      <details class="advanced" [open]="quick() === null">
+        <summary>Más filtros (proveedor, fechas, estado)</summary>
+        <form [formGroup]="form" (ngSubmit)="applyCustom()">
+          <mat-form-field appearance="outline">
+            <mat-label>Proveedor</mat-label>
+            <mat-select formControlName="providerId" (selectionChange)="load()">
+              <mat-option value="">Todos</mat-option>
+              @for (provider of providers(); track provider.id) {
+                <mat-option [value]="provider.id">{{ provider.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Desde</mat-label>
+            <input matInput type="date" formControlName="from" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Hasta</mat-label>
+            <input matInput type="date" formControlName="to" />
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Estado de pago</mat-label>
+            <mat-select formControlName="paymentStatus">
+              <mat-option value="">Todos</mat-option>
+              <mat-option value="PENDIENTE">Pendiente</mat-option>
+              <mat-option value="PAGADA">Pagada</mat-option>
+            </mat-select>
+          </mat-form-field>
+          <button mat-flat-button color="primary" type="submit" class="full">Aplicar filtros</button>
+        </form>
+      </details>
 
       <a
         mat-stroked-button
@@ -204,6 +225,53 @@ interface ProviderDebt {
       }
       .back {
         margin: 0 0 8px -8px;
+      }
+      .quick {
+        display: flex;
+        gap: 8px;
+        overflow-x: auto;
+        padding: 2px 2px 10px;
+        margin-bottom: 4px;
+        scrollbar-width: none;
+      }
+      .quick::-webkit-scrollbar {
+        display: none;
+      }
+      .quick-chip {
+        flex: 0 0 auto;
+        min-height: 44px;
+        padding: 0 18px;
+        border-radius: 999px;
+        border: 1px solid var(--color-border);
+        background: var(--color-card);
+        color: var(--color-foreground);
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+      }
+      .quick-chip.active {
+        background: var(--color-primary);
+        border-color: var(--color-primary);
+        color: var(--color-on-primary);
+      }
+      .advanced {
+        margin-bottom: var(--space-md);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        background: var(--color-card);
+        padding: 0 var(--space-md);
+      }
+      .advanced summary {
+        min-height: 48px;
+        display: flex;
+        align-items: center;
+        font-weight: 600;
+        color: var(--color-primary);
+        cursor: pointer;
+      }
+      .advanced form {
+        padding-bottom: var(--space-sm);
       }
       .worker-link {
         text-decoration: none;
@@ -371,6 +439,13 @@ export class HistoryComponent implements OnInit {
   readonly shifts = signal<WorkShift[]>([]);
   readonly pendingShifts = signal<WorkShift[]>([]);
   readonly selectedWorkerId = signal<string | null>(null);
+  readonly quick = signal<QuickFilter | null>('all');
+  readonly quickOptions: { id: QuickFilter; label: string }[] = [
+    { id: 'all', label: 'Todos' },
+    { id: 'pending', label: 'Pendientes' },
+    { id: 'week', label: 'Esta semana' },
+    { id: 'month', label: 'Este mes' },
+  ];
   readonly form;
 
   readonly selectedWorker = computed(() => {
@@ -463,6 +538,30 @@ export class HistoryComponent implements OnInit {
         }
       });
     });
+  }
+
+  applyQuick(id: QuickFilter): void {
+    const today = new Date();
+    const patch = { from: '', to: '', paymentStatus: '' };
+    if (id === 'pending') {
+      patch.paymentStatus = 'PENDIENTE';
+    } else if (id === 'week') {
+      const monday = new Date(today);
+      monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+      patch.from = formatLocalDate(monday);
+      patch.to = formatLocalDate(today);
+    } else if (id === 'month') {
+      patch.from = formatLocalDate(new Date(today.getFullYear(), today.getMonth(), 1));
+      patch.to = formatLocalDate(today);
+    }
+    this.form.patchValue(patch);
+    this.quick.set(id);
+    this.load();
+  }
+
+  applyCustom(): void {
+    this.quick.set(null);
+    this.load();
   }
 
   load(): void {

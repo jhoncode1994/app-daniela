@@ -3,6 +3,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
@@ -12,6 +13,7 @@ import { httpErrorMessage } from '../../core/http-error';
 import { PaymentRecord, Provider, SettlementPreview, Worker } from '../../core/models';
 import { DurationPipe } from '../../shared/duration.pipe';
 import { MoneyPipe } from '../../shared/money.pipe';
+import { ConfirmPaymentDialogComponent } from './confirm-payment.dialog';
 import { downloadPaymentPdf } from '../../shared/payment-pdf';
 
 @Component({
@@ -20,6 +22,7 @@ import { downloadPaymentPdf } from '../../shared/payment-pdf';
     ReactiveFormsModule,
     MatButtonModule,
     MatCardModule,
+    MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
@@ -97,14 +100,21 @@ import { downloadPaymentPdf } from '../../shared/payment-pdf';
               <strong>{{ data.pendingAmount | money }}</strong>
             </div>
           </div>
-          @if (data.pendingShiftCount > 0) {
-            <button mat-flat-button color="primary" class="full" type="button" [disabled]="paying()" (click)="pay()">
-              Pagar {{ data.pendingAmount | money }} · {{ data.worker.name }} en {{ data.provider.name }}
-            </button>
-          } @else {
+          @if (data.pendingShiftCount === 0) {
             <p>No hay jornadas pendientes de {{ data.worker.name }} en {{ data.provider.name }} para este periodo.</p>
           }
         </mat-card>
+        @if (data.pendingShiftCount > 0) {
+          <div class="pay-bar">
+            <div class="pay-info">
+              <span>{{ data.worker.name }} · {{ data.provider.name }}</span>
+              <strong>{{ data.pendingAmount | money }}</strong>
+            </div>
+            <button mat-flat-button color="primary" type="button" [disabled]="paying()" (click)="pay()">
+              Pagar
+            </button>
+          </div>
+        }
       }
 
       <h2>Pagos anteriores@if (paymentsScope()) { · {{ paymentsScope() }} }</h2>
@@ -190,6 +200,40 @@ import { downloadPaymentPdf } from '../../shared/payment-pdf';
         color: var(--color-primary);
         font-size: 1.2rem;
       }
+      .pay-bar {
+        position: sticky;
+        bottom: calc(80px + env(safe-area-inset-bottom));
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin: 12px 0;
+        padding: 10px 12px 10px 16px;
+        border-radius: var(--radius);
+        background: var(--color-card);
+        border: 1px solid rgba(165, 107, 116, 0.35);
+        box-shadow: var(--shadow-md);
+      }
+      .pay-info {
+        min-width: 0;
+      }
+      .pay-info span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        color: var(--color-muted-foreground);
+        font-size: 0.85rem;
+      }
+      .pay-info strong {
+        color: var(--color-primary);
+        font-size: 1.25rem;
+      }
+      .pay-bar button {
+        min-width: 110px;
+        min-height: var(--touch);
+      }
       .item {
         display: flex;
         justify-content: space-between;
@@ -231,6 +275,7 @@ export class SettlementsComponent implements OnInit {
     private readonly api: ApiService,
     private readonly snack: MatSnackBar,
     private readonly route: ActivatedRoute,
+    private readonly dialog: MatDialog,
   ) {
     this.form = fb.nonNullable.group({
       workerId: ['', Validators.required],
@@ -283,24 +328,40 @@ export class SettlementsComponent implements OnInit {
   }
 
   pay(): void {
-    if (this.form.invalid) {
-      return;
-    }
     const current = this.settlement();
-    if (
-      current &&
-      !window.confirm(
-        `¿Pagar solo lo de ${current.worker.name} en ${current.provider.name}? El tiempo de otros proveedores no se incluye.`,
-      )
-    ) {
+    if (this.form.invalid || !current) {
       return;
     }
+    this.dialog
+      .open(ConfirmPaymentDialogComponent, {
+        width: 'min(420px, 92vw)',
+        data: {
+          worker: current.worker.name,
+          provider: current.provider.name,
+          from: current.from,
+          to: current.to,
+          shiftCount: current.pendingShiftCount,
+          netMinutes: current.shifts
+            .filter((shift) => shift.paymentStatus === 'PENDIENTE')
+            .reduce((sum, shift) => sum + shift.netMinutes, 0),
+          amount: current.pendingAmount,
+        },
+      })
+      .afterClosed()
+      .subscribe((confirmed) => {
+        if (confirmed) {
+          this.submitPayment(current);
+        }
+      });
+  }
+
+  private submitPayment(current: SettlementPreview): void {
     this.paying.set(true);
     const { workerId, providerId, from, to } = this.form.getRawValue();
     this.api.createPayment({ workerId, providerId, from, to }).subscribe({
       next: (payment) => {
         this.paying.set(false);
-        this.snack.open(`Pago de ${current?.provider.name} registrado. Descargando PDF…`, 'OK', {
+        this.snack.open(`Pago de ${current.provider.name} registrado. Descargando PDF…`, 'OK', {
           duration: 3000,
         });
         this.downloadPdf(payment);
