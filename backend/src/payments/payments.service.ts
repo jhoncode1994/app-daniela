@@ -161,8 +161,36 @@ export class PaymentsService {
     createdAt: Date;
     worker: { id: string; name: string };
     provider: { id: string; name: string } | null;
-    paymentShifts: { shiftId: string; shift: { workDate: Date; earnedAmount: number } }[];
+    paymentShifts: {
+      shiftId: string;
+      shift: {
+        workDate: Date;
+        startTime: string;
+        endTime: string | null;
+        mealBreakMinutes: number;
+        grossMinutes: number;
+        netMinutes: number;
+        hourlyRate: number;
+        earnedAmount: number;
+      };
+    }[];
   }) {
+    const shifts = payment.paymentShifts
+      .map(({ shiftId, shift }) => ({
+        id: shiftId,
+        workDate: dateOnlyToString(shift.workDate),
+        startTime: shift.startTime,
+        endTime: shift.endTime,
+        mealBreakMinutes: shift.mealBreakMinutes,
+        grossMinutes: shift.grossMinutes,
+        netMinutes: shift.netMinutes,
+        hourlyRate: shift.hourlyRate,
+        earnedAmount: shift.earnedAmount,
+      }))
+      .sort((a, b) =>
+        `${a.workDate} ${a.startTime}`.localeCompare(`${b.workDate} ${b.startTime}`),
+      );
+
     return {
       id: payment.id,
       workerId: payment.workerId,
@@ -174,6 +202,7 @@ export class PaymentsService {
       createdAt: payment.createdAt,
       shiftIds: payment.paymentShifts.map((item) => item.shiftId),
       shiftCount: payment.paymentShifts.length,
+      shifts,
     };
   }
 }

@@ -131,4 +131,17 @@ export interface PaymentRecord {
   createdAt: string;
   shiftIds: string[];
   shiftCount: number;
+  shifts: PaymentShiftDetail[];
+}
+
+export interface PaymentShiftDetail {
+  id: string;
+  workDate: string;
+  startTime: string;
+  endTime: string | null;
+  mealBreakMinutes: number;
+  grossMinutes: number;
+  netMinutes: number;
+  hourlyRate: number;
+  earnedAmount: number;
 }

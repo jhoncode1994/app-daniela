@@ -12,6 +12,7 @@ import { httpErrorMessage } from '../../core/http-error';
 import { PaymentRecord, Provider, SettlementPreview, Worker } from '../../core/models';
 import { DurationPipe } from '../../shared/duration.pipe';
 import { MoneyPipe } from '../../shared/money.pipe';
+import { downloadPaymentPdf } from '../../shared/payment-pdf';
 
 @Component({
   selector: 'app-settlements',
@@ -113,7 +114,10 @@ import { MoneyPipe } from '../../shared/money.pipe';
             <h3>{{ payment.worker.name }}@if (payment.provider) { · {{ payment.provider.name }} }</h3>
             <p>{{ payment.paymentDate }} · {{ payment.shiftCount }} jornada(s)</p>
           </div>
-          <strong>{{ payment.amount | money }}</strong>
+          <div class="amount">
+            <strong>{{ payment.amount | money }}</strong>
+            <button mat-stroked-button type="button" (click)="downloadPdf(payment)">Descargar PDF</button>
+          </div>
         </mat-card>
       } @empty {
         <p class="empty">Aún no hay pagos registrados para esta selección.</p>
@@ -194,6 +198,12 @@ import { MoneyPipe } from '../../shared/money.pipe';
       }
       .item strong {
         color: var(--color-success);
+      }
+      .amount {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 6px;
       }
       p {
         margin: 6px 0;
@@ -288,9 +298,12 @@ export class SettlementsComponent implements OnInit {
     this.paying.set(true);
     const { workerId, providerId, from, to } = this.form.getRawValue();
     this.api.createPayment({ workerId, providerId, from, to }).subscribe({
-      next: () => {
+      next: (payment) => {
         this.paying.set(false);
-        this.snack.open(`Pago de ${current?.provider.name} registrado`, 'OK', { duration: 2500 });
+        this.snack.open(`Pago de ${current?.provider.name} registrado. Descargando PDF…`, 'OK', {
+          duration: 3000,
+        });
+        this.downloadPdf(payment);
         this.preview();
       },
       error: (err) => {
@@ -298,6 +311,12 @@ export class SettlementsComponent implements OnInit {
         this.snack.open(httpErrorMessage(err), 'OK', { duration: 4000 });
       },
     });
+  }
+
+  downloadPdf(payment: PaymentRecord): void {
+    downloadPaymentPdf(payment).catch(() =>
+      this.snack.open('No se pudo generar el PDF', 'OK', { duration: 4000 }),
+    );
   }
 
   private reloadPayments(): void {
