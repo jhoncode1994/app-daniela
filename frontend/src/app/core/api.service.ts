@@ -135,7 +135,7 @@ export class ApiService {
   }
 
   deletePayment(id: string) {
-    return this.http.delete<{ deleted: boolean; restoredShifts: number }>(`/api/payments/${id}`);
+    return this.http.delete<{ voided: boolean; restoredShifts: number }>(`/api/payments/${id}`);
   }
 
   getPayments(filters?: { workerId?: string; providerId?: string }) {

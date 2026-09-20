@@ -17,7 +17,7 @@ function dayLabel(date: string): string {
   return `${WEEKDAYS[new Date(y, m - 1, d).getDay()]} ${date}`;
 }
 
-const BUSINESS_NAME = 'Control de jornadas';
+const BUSINESS_NAME = 'Daniela';
 
 async function buildPaymentPdf(payment: PaymentRecord): Promise<{ doc: import('jspdf').jsPDF; filename: string }> {
   const [{ jsPDF }, { default: autoTable }] = await Promise.all([

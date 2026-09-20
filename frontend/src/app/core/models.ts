@@ -132,6 +132,8 @@ export interface PaymentRecord {
   shiftIds: string[];
   shiftCount: number;
   shifts: PaymentShiftDetail[];
+  voided: boolean;
+  voidedAt: string | null;
 }
 
 export interface PaymentShiftDetail {

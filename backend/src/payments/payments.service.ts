@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PaymentStatus } from '@prisma/client';
+import { PaymentStatus, Prisma } from '@prisma/client';
 import { dateOnlyToString, toDateOnly, todayInBogota } from '../common/time-money';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
@@ -139,19 +139,32 @@ export class PaymentsService {
   async remove(id: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
-      include: { paymentShifts: true },
+      include: {
+        worker: true,
+        provider: true,
+        paymentShifts: { include: { shift: true } },
+      },
     });
     if (!payment) {
       throw new NotFoundException('Pago no encontrado');
     }
+    if (payment.voidedAt) {
+      throw new BadRequestException('Este pago ya fue anulado');
+    }
+
+    const snapshot = this.serializePayment(payment).shifts;
     await this.prisma.$transaction([
       this.prisma.workShift.updateMany({
         where: { id: { in: payment.paymentShifts.map((item) => item.shiftId) } },
         data: { paymentStatus: PaymentStatus.PENDIENTE },
       }),
-      this.prisma.payment.delete({ where: { id } }),
+      this.prisma.paymentShift.deleteMany({ where: { paymentId: id } }),
+      this.prisma.payment.update({
+        where: { id },
+        data: { voidedAt: new Date(), voidedShifts: snapshot },
+      }),
     ]);
-    return { deleted: true, restoredShifts: payment.paymentShifts.length };
+    return { voided: true, restoredShifts: snapshot.length };
   }
 
   private async requireWorker(id: string) {
@@ -177,6 +190,8 @@ export class PaymentsService {
     paymentDate: Date;
     amount: number;
     createdAt: Date;
+    voidedAt: Date | null;
+    voidedShifts: Prisma.JsonValue | null;
     worker: { id: string; name: string };
     provider: { id: string; name: string } | null;
     paymentShifts: {
@@ -193,7 +208,7 @@ export class PaymentsService {
       };
     }[];
   }) {
-    const shifts = payment.paymentShifts
+    const live = payment.paymentShifts
       .map(({ shiftId, shift }) => ({
         id: shiftId,
         workDate: dateOnlyToString(shift.workDate),
@@ -208,6 +223,9 @@ export class PaymentsService {
       .sort((a, b) =>
         `${a.workDate} ${a.startTime}`.localeCompare(`${b.workDate} ${b.startTime}`),
       );
+    const shifts = payment.voidedAt
+      ? ((payment.voidedShifts ?? []) as unknown as typeof live)
+      : live;
 
     return {
       id: payment.id,
@@ -218,8 +236,10 @@ export class PaymentsService {
       paymentDate: dateOnlyToString(payment.paymentDate),
       amount: payment.amount,
       createdAt: payment.createdAt,
-      shiftIds: payment.paymentShifts.map((item) => item.shiftId),
-      shiftCount: payment.paymentShifts.length,
+      voided: payment.voidedAt !== null,
+      voidedAt: payment.voidedAt,
+      shiftIds: shifts.map((item) => item.id),
+      shiftCount: shifts.length,
       shifts,
     };
   }

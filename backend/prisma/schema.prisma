@@ -74,6 +74,8 @@ model Payment {
   paymentDate DateTime  @map("payment_date") @db.Date
   amount      Int
   createdAt   DateTime  @default(now()) @map("created_at")
+  voidedAt     DateTime? @map("voided_at")
+  voidedShifts Json?     @map("voided_shifts")
 
   paymentShifts PaymentShift[]
 

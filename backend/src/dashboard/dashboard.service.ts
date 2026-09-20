@@ -37,7 +37,7 @@ export class DashboardService {
     });
 
     const [paid, earned] = await Promise.all([
-      this.prisma.payment.aggregate({ _sum: { amount: true } }),
+      this.prisma.payment.aggregate({ where: { voidedAt: null }, _sum: { amount: true } }),
       this.prisma.workShift.aggregate({ _sum: { earnedAmount: true } }),
     ]);
 

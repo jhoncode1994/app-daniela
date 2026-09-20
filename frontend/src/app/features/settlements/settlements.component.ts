@@ -120,13 +120,18 @@ import { downloadPaymentPdf, sharePaymentPdf } from '../../shared/payment-pdf';
 
       <h2>Pagos anteriores@if (paymentsScope()) { · {{ paymentsScope() }} }</h2>
       @for (payment of payments(); track payment.id) {
-        <mat-card class="item">
+        <mat-card class="item" [class.voided]="payment.voided">
           <div class="item-head">
             <div>
               <h3>{{ payment.worker.name }}@if (payment.provider) { · {{ payment.provider.name }} }</h3>
               <p>{{ payment.paymentDate }} · {{ payment.shiftCount }} jornada(s)</p>
             </div>
-            <strong>{{ payment.amount | money }}</strong>
+            <div class="amount">
+              <strong>{{ payment.amount | money }}</strong>
+              @if (payment.voided) {
+                <span class="badge">Anulado</span>
+              }
+            </div>
           </div>
           <details class="detail">
             <summary>Ver detalle por día</summary>
@@ -139,11 +144,13 @@ import { downloadPaymentPdf, sharePaymentPdf } from '../../shared/payment-pdf';
               }
             </ul>
           </details>
+          @if (!payment.voided) {
           <div class="item-actions">
             <button mat-stroked-button type="button" (click)="downloadPdf(payment)">Descargar PDF</button>
             <button mat-stroked-button type="button" (click)="sharePdf(payment)">Compartir</button>
             <button mat-button color="warn" type="button" (click)="cancelPayment(payment)">Anular pago</button>
           </div>
+          }
         </mat-card>
               } @empty {
         <p class="empty">Aún no hay pagos registrados para esta selección.</p>
@@ -257,6 +264,27 @@ import { downloadPaymentPdf, sharePaymentPdf } from '../../shared/payment-pdf';
       }
       .item strong {
         color: var(--color-success);
+      }
+      .amount {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+      }
+      .badge {
+        padding: 2px 10px;
+        border-radius: 999px;
+        background: var(--warn-soft);
+        color: var(--warn);
+        font-size: 0.75rem;
+        font-weight: 700;
+      }
+      .item.voided {
+        opacity: 0.75;
+      }
+      .item.voided .amount strong {
+        color: var(--color-muted-foreground);
+        text-decoration: line-through;
       }
       .item-head {
         display: flex;
@@ -424,7 +452,7 @@ export class SettlementsComponent implements OnInit {
         width: 'min(420px, 92vw)',
         data: {
           title: 'Anular pago',
-          message: `Se anulará el pago de ${payment.worker.name} del ${payment.paymentDate} y sus ${payment.shiftCount} jornada(s) volverán a quedar pendientes. Úsalo solo si el pago se registró por error.`,
+          message: `Se anulará el pago de ${payment.worker.name} del ${payment.paymentDate} y sus ${payment.shiftCount} jornada(s) volverán a quedar pendientes. El pago se conserva en el historial marcado como anulado.`,
           confirmLabel: 'Anular pago',
           destructive: true,
         },
