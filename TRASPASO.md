@@ -1,12 +1,51 @@
 # Qué falta para continuar
 
 Documento para la IA que sigue el trabajo y **sí tiene acceso a la base de datos**. Estado:
-**23 de octubre de 2026**, commit `aee81d8` ya en `origin/main`.
+**23 de octubre de 2026**, con todo el código ya subido a `origin/main`.
 
 > **Antes de empezar:** el código de la aplicación está terminado, compilado y subido. No hace
 > falta reescribirlo ni rediseñar nada. Lo pendiente es base de datos, despliegue y pruebas con
 > datos reales. Si al probar aparece un error, corrígelo; pero no rehagas lo que ya está.
-> Hacer `git pull` antes de tocar nada.
+
+---
+
+## Dónde estás y cómo empezar
+
+| | |
+|---|---|
+| **Este documento** | `TRASPASO.md`, en la raíz del repositorio |
+| **Carpeta local en el computador** | `C:\Users\USUARIO\Documents\app web daniela` |
+| **Repositorio** | `https://github.com/jhoncode1994/app-daniela` |
+| **Rama** | `main` |
+| **Commit con todo el código** | `aee81d8` (puede haber commits posteriores solo de este documento) |
+
+**Primer paso, antes de leer código o tocar nada: bajar los cambios a la carpeta local.** Todo el
+trabajo descrito aquí ya está en GitHub; si la copia local está desactualizada, no se ve nada de
+esto.
+
+```
+cd "C:\Users\USUARIO\Documents\app web daniela"
+git status
+git pull origin main
+git log --oneline -3
+```
+
+En el `git log` tiene que aparecer el commit `aee81d8` ("Track work by lot reference and refresh
+the whole interface"). Si no está, el pull no trajo los cambios y no tiene sentido seguir con el
+resto del documento.
+
+Notas sobre el estado del árbol de trabajo:
+
+- `git status` va a mostrar tres archivos `.pyc` en el índice sin commitear, de antes de este
+  trabajo. No son parte de nada de esto; ver la última sección.
+- Puede aparecer `.claude/launch.json` sin seguimiento: es una configuración local para levantar
+  el servidor de desarrollo. Se puede ignorar o borrar.
+
+Si la carpeta local no existiera, clonar:
+
+```
+git clone https://github.com/jhoncode1994/app-daniela.git "C:\Users\USUARIO\Documents\app web daniela"
+```
 
 ---
 
