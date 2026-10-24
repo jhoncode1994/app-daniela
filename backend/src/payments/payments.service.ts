@@ -12,7 +12,8 @@ export class PaymentsService {
   async preview(query: SettlementQueryDto) {
     const worker = await this.requireWorker(query.workerId);
     const provider = await this.requireProvider(query.providerId);
-    if (query.from > query.to) {
+    const lot = await this.requireLot(query.lotId, provider.id);
+    if (query.from && query.to && query.from > query.to) {
       throw new BadRequestException('La fecha inicial no puede ser mayor que la final');
     }
 
@@ -20,13 +21,18 @@ export class PaymentsService {
       where: {
         workerId: query.workerId,
         providerId: query.providerId,
+        lotId: query.lotId,
         endTime: { not: null },
-        workDate: {
-          gte: toDateOnly(query.from),
-          lte: toDateOnly(query.to),
-        },
+        ...(query.from || query.to
+          ? {
+              workDate: {
+                ...(query.from ? { gte: toDateOnly(query.from) } : {}),
+                ...(query.to ? { lte: toDateOnly(query.to) } : {}),
+              },
+            }
+          : {}),
       },
-      include: { provider: true },
+      include: { provider: true, lot: true },
       orderBy: [{ workDate: 'asc' }, { startTime: 'asc' }],
     });
 
@@ -58,14 +64,16 @@ export class PaymentsService {
     return {
       worker: { id: worker.id, name: worker.name },
       provider: { id: provider.id, name: provider.name },
-      from: query.from,
-      to: query.to,
+      lot: { id: lot.id, reference: lot.reference, closed: lot.closed },
+      from: query.from ?? null,
+      to: query.to ?? null,
       ...totals,
       pendingShiftCount: totals.pendingShiftIds.length,
       shifts: shifts.map((shift) => ({
         ...shift,
         workDate: dateOnlyToString(shift.workDate),
         provider: { id: shift.provider.id, name: shift.provider.name },
+        lot: shift.lot ? { id: shift.lot.id, reference: shift.lot.reference } : null,
       })),
     };
   }
@@ -73,7 +81,18 @@ export class PaymentsService {
   async create(dto: CreatePaymentDto) {
     const preview = await this.preview(dto);
     if (preview.pendingShiftCount === 0) {
-      throw new BadRequestException('No hay jornadas pendientes en el periodo seleccionado');
+      throw new BadRequestException(
+        `No hay jornadas pendientes de ${preview.worker.name} en la referencia ${preview.lot.reference}`,
+      );
+    }
+
+    // Sin selección se paga todo lo pendiente de esa referencia.
+    const wanted = dto.shiftIds ?? preview.pendingShiftIds;
+    const outside = wanted.filter((id) => !preview.pendingShiftIds.includes(id));
+    if (outside.length > 0) {
+      throw new BadRequestException(
+        'Hay jornadas seleccionadas que no están pendientes en esta referencia. Vuelva a consultar la liquidación.',
+      );
     }
 
     const paymentDate = dto.paymentDate ?? todayInBogota();
@@ -81,13 +100,14 @@ export class PaymentsService {
     return this.prisma.$transaction(async (tx) => {
       const pending = await tx.workShift.findMany({
         where: {
-          id: { in: preview.pendingShiftIds },
+          id: { in: wanted },
           paymentStatus: PaymentStatus.PENDIENTE,
           providerId: dto.providerId,
+          lotId: dto.lotId,
         },
       });
 
-      if (pending.length !== preview.pendingShiftIds.length) {
+      if (pending.length !== wanted.length) {
         throw new BadRequestException(
           'Algunas jornadas ya fueron pagadas. Vuelva a consultar la liquidación.',
         );
@@ -98,6 +118,7 @@ export class PaymentsService {
         data: {
           workerId: dto.workerId,
           providerId: dto.providerId,
+          lotId: dto.lotId,
           paymentDate: toDateOnly(paymentDate),
           amount,
           paymentShifts: {
@@ -107,6 +128,7 @@ export class PaymentsService {
         include: {
           worker: true,
           provider: true,
+          lot: true,
           paymentShifts: { include: { shift: true } },
         },
       });
@@ -120,15 +142,17 @@ export class PaymentsService {
     });
   }
 
-  async findAll(workerId?: string, providerId?: string) {
+  async findAll(workerId?: string, providerId?: string, lotId?: string) {
     const payments = await this.prisma.payment.findMany({
       where: {
         ...(workerId ? { workerId } : {}),
         ...(providerId ? { providerId } : {}),
+        ...(lotId ? { lotId } : {}),
       },
       include: {
         worker: true,
         provider: true,
+        lot: true,
         paymentShifts: { include: { shift: true } },
       },
       orderBy: { createdAt: 'desc' },
@@ -142,6 +166,7 @@ export class PaymentsService {
       include: {
         worker: true,
         provider: true,
+        lot: true,
         paymentShifts: { include: { shift: true } },
       },
     });
@@ -183,10 +208,22 @@ export class PaymentsService {
     return provider;
   }
 
+  private async requireLot(id: string, providerId: string) {
+    const lot = await this.prisma.lot.findUnique({ where: { id } });
+    if (!lot) {
+      throw new NotFoundException('Referencia no encontrada');
+    }
+    if (lot.providerId !== providerId) {
+      throw new BadRequestException('La referencia no pertenece a ese proveedor');
+    }
+    return lot;
+  }
+
   private serializePayment(payment: {
     id: string;
     workerId: string;
     providerId: string | null;
+    lotId: string | null;
     paymentDate: Date;
     amount: number;
     createdAt: Date;
@@ -194,6 +231,7 @@ export class PaymentsService {
     voidedShifts: Prisma.JsonValue | null;
     worker: { id: string; name: string };
     provider: { id: string; name: string } | null;
+    lot: { id: string; reference: string } | null;
     paymentShifts: {
       shiftId: string;
       shift: {
@@ -233,6 +271,8 @@ export class PaymentsService {
       worker: payment.worker,
       providerId: payment.providerId,
       provider: payment.provider,
+      lotId: payment.lotId,
+      lot: payment.lot ? { id: payment.lot.id, reference: payment.lot.reference } : null,
       paymentDate: dateOnlyToString(payment.paymentDate),
       amount: payment.amount,
       createdAt: payment.createdAt,

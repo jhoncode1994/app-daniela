@@ -1,4 +1,4 @@
-import { IsUUID, Matches } from 'class-validator';
+import { IsOptional, IsUUID, Matches } from 'class-validator';
 
 export class SettlementQueryDto {
   @IsUUID()
@@ -7,9 +7,14 @@ export class SettlementQueryDto {
   @IsUUID()
   providerId: string;
 
-  @Matches(/^\d{4}-\d{2}-\d{2}$/)
-  from: string;
+  @IsUUID()
+  lotId: string;
 
+  @IsOptional()
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
-  to: string;
+  from?: string;
+
+  @IsOptional()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  to?: string;
 }

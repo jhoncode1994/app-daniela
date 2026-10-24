@@ -17,6 +17,7 @@ import { UpdateShiftDto } from './dto/update-shift.dto';
 const shiftInclude = {
   worker: true,
   provider: true,
+  lot: true,
 } as const;
 
 @Injectable()
@@ -26,6 +27,7 @@ export class ShiftsService {
   async preview(dto: ShiftInputDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
     const provider = await this.requireActiveProvider(dto.providerId);
+    const lot = await this.requireOpenLot(dto.lotId, provider.id);
     const calculation = calculateShift({
       startTime: dto.startTime,
       endTime: dto.endTime,
@@ -35,6 +37,7 @@ export class ShiftsService {
     return {
       worker: { id: worker.id, name: worker.name },
       provider: { id: provider.id, name: provider.name },
+      lot: { id: lot.id, reference: lot.reference },
       workDate: dto.workDate,
       startTime: dto.startTime,
       endTime: dto.endTime,
@@ -45,6 +48,7 @@ export class ShiftsService {
   async previewBatch(dto: BatchShiftsDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
     const provider = await this.requireActiveProvider(dto.providerId);
+    const lot = await this.requireOpenLot(dto.lotId, provider.id);
     const segments = dto.segments.map((segment) => {
       const calculation = calculateShift({
         startTime: segment.startTime,
@@ -62,6 +66,7 @@ export class ShiftsService {
     return {
       worker: { id: worker.id, name: worker.name },
       provider: { id: provider.id, name: provider.name },
+      lot: { id: lot.id, reference: lot.reference },
       workDate: dto.workDate,
       segments,
       totals: {
@@ -77,18 +82,21 @@ export class ShiftsService {
   async create(dto: ShiftInputDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
     const provider = await this.requireActiveProvider(dto.providerId);
-    return this.createForWorker(worker, provider, dto);
+    const lot = await this.requireOpenLot(dto.lotId, provider.id);
+    return this.createForWorker(worker, provider, lot, dto);
   }
 
   async createBatch(dto: BatchShiftsDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
     const provider = await this.requireActiveProvider(dto.providerId);
+    const lot = await this.requireOpenLot(dto.lotId, provider.id);
     const created: Awaited<ReturnType<ShiftsService['createForWorker']>>[] = [];
     for (const segment of dto.segments) {
       created.push(
-        await this.createForWorker(worker, provider, {
+        await this.createForWorker(worker, provider, lot, {
           workerId: dto.workerId,
           providerId: dto.providerId,
+          lotId: dto.lotId,
           workDate: dto.workDate,
           startTime: segment.startTime,
           endTime: segment.endTime,
@@ -102,6 +110,7 @@ export class ShiftsService {
   async clockIn(dto: ClockInDto) {
     const worker = await this.requireActiveWorker(dto.workerId);
     const provider = await this.requireActiveProvider(dto.providerId);
+    const lot = await this.requireOpenLot(dto.lotId, provider.id);
     const open = await this.findOpenShift(worker.id);
     if (open) {
       throw new ConflictException(
@@ -113,6 +122,7 @@ export class ShiftsService {
       data: {
         workerId: worker.id,
         providerId: provider.id,
+        lotId: lot.id,
         workDate: toDateOnly(dto.workDate),
         startTime: dto.startTime,
         endTime: null,
@@ -169,6 +179,7 @@ export class ShiftsService {
   private async createForWorker(
     worker: { id: string; name: string; hourlyRate: number },
     provider: { id: string; name: string },
+    lot: { id: string; reference: string },
     dto: ShiftInputDto,
   ) {
     const calculation = calculateShift({
@@ -182,6 +193,7 @@ export class ShiftsService {
       data: {
         workerId: worker.id,
         providerId: provider.id,
+        lotId: lot.id,
         workDate: toDateOnly(dto.workDate),
         startTime: dto.startTime,
         endTime: dto.endTime,
@@ -204,6 +216,9 @@ export class ShiftsService {
     }
     if (query.providerId) {
       where.providerId = query.providerId;
+    }
+    if (query.lotId) {
+      where.lotId = query.lotId;
     }
     if (query.paymentStatus) {
       where.paymentStatus = query.paymentStatus;
@@ -250,11 +265,17 @@ export class ShiftsService {
     const endTime = dto.endTime !== undefined ? dto.endTime : shift.endTime;
     const mealBreakMinutes = dto.mealBreakMinutes ?? shift.mealBreakMinutes;
     const workDate = dto.workDate ?? dateOnlyToString(shift.workDate);
+    // Al corregir una jornada se puede reasignar la referencia, incluso a una dada de baja.
+    const lotId =
+      dto.lotId !== undefined
+        ? (await this.requireLotForProvider(dto.lotId, shift.providerId)).id
+        : shift.lotId;
 
     if (!endTime) {
       const updated = await this.prisma.workShift.update({
         where: { id },
         data: {
+          lotId,
           workDate: toDateOnly(workDate),
           startTime,
           endTime: null,
@@ -278,6 +299,7 @@ export class ShiftsService {
     const updated = await this.prisma.workShift.update({
       where: { id },
       data: {
+        lotId,
         workDate: toDateOnly(workDate),
         startTime,
         endTime,
@@ -333,10 +355,30 @@ export class ShiftsService {
     return provider;
   }
 
+  private async requireLotForProvider(id: string, providerId: string) {
+    const lot = await this.prisma.lot.findUnique({ where: { id } });
+    if (!lot) {
+      throw new NotFoundException('Referencia no encontrada');
+    }
+    if (lot.providerId !== providerId) {
+      throw new BadRequestException('La referencia no pertenece a ese proveedor');
+    }
+    return lot;
+  }
+
+  private async requireOpenLot(id: string, providerId: string) {
+    const lot = await this.requireLotForProvider(id, providerId);
+    if (lot.closed) {
+      throw new BadRequestException(`La referencia ${lot.reference} está dada de baja`);
+    }
+    return lot;
+  }
+
   private serialize(shift: {
     id: string;
     workerId: string;
     providerId: string;
+    lotId: string | null;
     workDate: Date;
     startTime: string;
     endTime: string | null;
@@ -350,6 +392,7 @@ export class ShiftsService {
     updatedAt: Date;
     worker: { id: string; name: string };
     provider: { id: string; name: string };
+    lot: { id: string; reference: string } | null;
   }) {
     return {
       ...shift,
@@ -357,6 +400,7 @@ export class ShiftsService {
       open: shift.endTime === null,
       worker: { id: shift.worker.id, name: shift.worker.name },
       provider: { id: shift.provider.id, name: shift.provider.name },
+      lot: shift.lot ? { id: shift.lot.id, reference: shift.lot.reference } : null,
     };
   }
 }

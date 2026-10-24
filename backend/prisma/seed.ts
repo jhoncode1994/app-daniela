@@ -13,6 +13,23 @@ async function main() {
     });
   }
 
+  // Sin referencias no se pueden registrar horas: se deja una de ejemplo por proveedor.
+  const lotCount = await prisma.lot.count();
+  if (lotCount === 0) {
+    const providers = await prisma.provider.findMany({ where: { active: true } });
+    for (const provider of providers) {
+      await prisma.lot.create({
+        data: {
+          providerId: provider.id,
+          reference: 'REF-1',
+          notes: 'Referencia de ejemplo; renómbrela o dele de baja.',
+          units: 0,
+          unitPrice: 0,
+        },
+      });
+    }
+  }
+
   const existing = await prisma.worker.count();
   if (existing > 0) {
     return;

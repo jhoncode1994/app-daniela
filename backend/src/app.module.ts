@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { PaymentsModule } from './payments/payments.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { LotsModule } from './lots/lots.module';
 import { ProvidersModule } from './providers/providers.module';
 import { ShiftsModule } from './shifts/shifts.module';
 import { WorkersModule } from './workers/workers.module';
@@ -19,6 +20,7 @@ import { WorkersModule } from './workers/workers.module';
     AuthModule,
     WorkersModule,
     ProvidersModule,
+    LotsModule,
     ShiftsModule,
     PaymentsModule,
     DashboardModule,

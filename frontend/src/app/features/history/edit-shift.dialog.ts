@@ -4,9 +4,16 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { WorkShift } from '../../core/models';
+import { MatSelectModule } from '@angular/material/select';
+import { Lot, WorkShift } from '../../core/models';
+
+export interface ShiftEditData {
+  shift: WorkShift;
+  lots: Lot[];
+}
 
 export interface ShiftEditResult {
+  lotId?: string;
   workDate: string;
   startTime: string;
   endTime?: string;
@@ -21,12 +28,26 @@ export interface ShiftEditResult {
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
   ],
   template: `
     <h2 mat-dialog-title>Corregir registro</h2>
     <form [formGroup]="form" (ngSubmit)="save()">
       <mat-dialog-content>
         <p class="who">{{ shift.worker.name }} · {{ shift.provider.name }}</p>
+        <mat-form-field appearance="outline">
+          <mat-label>Referencia del lote</mat-label>
+          <mat-select formControlName="lotId">
+            @for (lot of data.lots; track lot.id) {
+              <mat-option [value]="lot.id">
+                {{ lot.reference }}@if (lot.closed) { · dada de baja }
+              </mat-option>
+            }
+          </mat-select>
+          @if (!shift.lot) {
+            <mat-hint>Este registro quedó sin referencia; asígnale una.</mat-hint>
+          }
+        </mat-form-field>
         <mat-form-field appearance="outline">
           <mat-label>Fecha</mat-label>
           <input matInput type="date" formControlName="workDate" />
@@ -70,9 +91,11 @@ export interface ShiftEditResult {
   ],
 })
 export class EditShiftDialogComponent {
-  readonly shift = inject<WorkShift>(MAT_DIALOG_DATA);
+  readonly data = inject<ShiftEditData>(MAT_DIALOG_DATA);
+  readonly shift = this.data.shift;
   private readonly ref = inject<MatDialogRef<EditShiftDialogComponent, ShiftEditResult>>(MatDialogRef);
   readonly form = inject(FormBuilder).nonNullable.group({
+    lotId: [this.shift.lotId ?? '', Validators.required],
     workDate: [this.shift.workDate, Validators.required],
     startTime: [this.shift.startTime, Validators.required],
     endTime: [this.shift.endTime ?? '', this.shift.endTime ? Validators.required : []],
@@ -85,6 +108,7 @@ export class EditShiftDialogComponent {
     }
     const value = this.form.getRawValue();
     this.ref.close({
+      ...(value.lotId && value.lotId !== this.shift.lotId ? { lotId: value.lotId } : {}),
       workDate: value.workDate,
       startTime: value.startTime,
       ...(value.endTime

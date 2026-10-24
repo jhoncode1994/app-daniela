@@ -4,6 +4,7 @@ import {
   BatchShiftPreview,
   BatchShiftsInput,
   DashboardSummary,
+  Lot,
   PaymentRecord,
   Provider,
   SettlementPreview,
@@ -53,6 +54,45 @@ export class ApiService {
     return this.http.delete(`/api/providers/${id}`);
   }
 
+  getLots(filters?: { providerId?: string; closed?: boolean }) {
+    let params = new HttpParams();
+    if (filters?.providerId) {
+      params = params.set('providerId', filters.providerId);
+    }
+    if (filters?.closed !== undefined) {
+      params = params.set('closed', String(filters.closed));
+    }
+    return this.http.get<Lot[]>('/api/lots', { params });
+  }
+
+  createLot(data: {
+    providerId: string;
+    reference: string;
+    notes?: string;
+    units?: number;
+    unitPrice?: number;
+    closed?: boolean;
+  }) {
+    return this.http.post<Lot>('/api/lots', data);
+  }
+
+  updateLot(
+    id: string,
+    data: Partial<{
+      reference: string;
+      notes: string;
+      units: number;
+      unitPrice: number;
+      closed: boolean;
+    }>,
+  ) {
+    return this.http.patch<Lot>(`/api/lots/${id}`, data);
+  }
+
+  deleteLot(id: string) {
+    return this.http.delete(`/api/lots/${id}`);
+  }
+
   previewShift(data: ShiftInput) {
     return this.http.post<ShiftPreview>('/api/shifts/preview', data);
   }
@@ -69,7 +109,13 @@ export class ApiService {
     return this.http.post<WorkShift[]>('/api/shifts/batch', data);
   }
 
-  clockIn(data: { workerId: string; providerId: string; workDate: string; startTime: string }) {
+  clockIn(data: {
+    workerId: string;
+    providerId: string;
+    lotId: string;
+    workDate: string;
+    startTime: string;
+  }) {
     return this.http.post<WorkShift>('/api/shifts/clock-in', data);
   }
 
@@ -84,6 +130,7 @@ export class ApiService {
   getShifts(filters: {
     workerId?: string;
     providerId?: string;
+    lotId?: string;
     from?: string;
     to?: string;
     paymentStatus?: string;
@@ -94,6 +141,9 @@ export class ApiService {
     }
     if (filters.providerId) {
       params = params.set('providerId', filters.providerId);
+    }
+    if (filters.lotId) {
+      params = params.set('lotId', filters.lotId);
     }
     if (filters.from) {
       params = params.set('from', filters.from);
@@ -109,7 +159,13 @@ export class ApiService {
 
   updateShift(
     id: string,
-    data: { workDate?: string; startTime?: string; endTime?: string; mealBreakMinutes?: number },
+    data: {
+      lotId?: string;
+      workDate?: string;
+      startTime?: string;
+      endTime?: string;
+      mealBreakMinutes?: number;
+    },
   ) {
     return this.http.patch<WorkShift>(`/api/shifts/${id}`, data);
   }
@@ -118,17 +174,33 @@ export class ApiService {
     return this.http.delete(`/api/shifts/${id}`);
   }
 
-  previewSettlement(workerId: string, providerId: string, from: string, to: string) {
-    return this.http.get<SettlementPreview>('/api/settlements/preview', {
-      params: { workerId, providerId, from, to },
-    });
+  previewSettlement(
+    workerId: string,
+    providerId: string,
+    lotId: string,
+    from?: string,
+    to?: string,
+  ) {
+    let params = new HttpParams()
+      .set('workerId', workerId)
+      .set('providerId', providerId)
+      .set('lotId', lotId);
+    if (from) {
+      params = params.set('from', from);
+    }
+    if (to) {
+      params = params.set('to', to);
+    }
+    return this.http.get<SettlementPreview>('/api/settlements/preview', { params });
   }
 
   createPayment(data: {
     workerId: string;
     providerId: string;
-    from: string;
-    to: string;
+    lotId: string;
+    from?: string;
+    to?: string;
+    shiftIds?: string[];
     paymentDate?: string;
   }) {
     return this.http.post<PaymentRecord>('/api/payments', data);
@@ -138,13 +210,16 @@ export class ApiService {
     return this.http.delete<{ voided: boolean; restoredShifts: number }>(`/api/payments/${id}`);
   }
 
-  getPayments(filters?: { workerId?: string; providerId?: string }) {
+  getPayments(filters?: { workerId?: string; providerId?: string; lotId?: string }) {
     let params = new HttpParams();
     if (filters?.workerId) {
       params = params.set('workerId', filters.workerId);
     }
     if (filters?.providerId) {
       params = params.set('providerId', filters.providerId);
+    }
+    if (filters?.lotId) {
+      params = params.set('lotId', filters.lotId);
     }
     return this.http.get<PaymentRecord[]>('/api/payments', { params });
   }

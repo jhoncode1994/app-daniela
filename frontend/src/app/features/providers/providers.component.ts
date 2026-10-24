@@ -53,7 +53,7 @@ import { Provider } from '../../core/models';
             <div>
               <h3>{{ provider.name }}</h3>
               <p>
-                <span [class.off]="!provider.active">{{ provider.active ? 'Activo' : 'Inactivo' }}</span>
+                <span class="pill" [class.is-success]="provider.active" [class.is-off]="!provider.active">{{ provider.active ? 'Activo' : 'Inactivo' }}</span>
               </p>
             </div>
           </div>
@@ -70,18 +70,6 @@ import { Provider } from '../../core/models';
   `,
   styles: [
     `
-      .eyebrow {
-        margin: 0 0 4px;
-        color: var(--color-primary);
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-      }
-      .hint {
-        margin: -4px 0 18px;
-        color: var(--color-muted-foreground);
-      }
       .form-card,
       .item {
         padding: var(--space-md);
@@ -106,14 +94,16 @@ import { Provider } from '../../core/models';
         min-width: 0;
       }
       .avatar {
-        width: 44px;
-        height: 44px;
-        border-radius: 14px;
+        width: 46px;
+        height: 46px;
+        border-radius: 15px;
         display: grid;
         place-items: center;
-        background: var(--color-muted);
+        background: linear-gradient(145deg, var(--color-muted), var(--surface-3));
+        border: 1px solid var(--color-border);
         color: var(--color-primary);
-        font-weight: 700;
+        font-size: 1.15rem;
+        font-weight: 800;
         flex-shrink: 0;
       }
       h2 {

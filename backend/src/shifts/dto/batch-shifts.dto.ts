@@ -33,6 +33,9 @@ export class BatchShiftsDto {
   @IsUUID()
   providerId: string;
 
+  @IsUUID()
+  lotId: string;
+
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'La fecha debe tener el formato YYYY-MM-DD' })
   workDate: string;
 

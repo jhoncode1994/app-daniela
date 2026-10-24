@@ -2,6 +2,22 @@ import { Injectable } from '@nestjs/common';
 import { PaymentStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
+type LotDebt = {
+  lotId: string | null;
+  reference: string;
+  closed: boolean;
+  pendingAmount: number;
+  pendingShifts: number;
+};
+
+type ProviderDebt = {
+  providerId: string;
+  providerName: string;
+  pendingAmount: number;
+  pendingShifts: number;
+  lots: LotDebt[];
+};
+
 @Injectable()
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
@@ -12,27 +28,69 @@ export class DashboardService {
       orderBy: { name: 'asc' },
       include: {
         workShifts: {
+          where: { paymentStatus: PaymentStatus.PENDIENTE, endTime: { not: null } },
           select: {
-            paymentStatus: true,
             earnedAmount: true,
-            endTime: true,
+            providerId: true,
+            provider: { select: { name: true } },
+            lotId: true,
+            lot: { select: { reference: true, closed: true } },
           },
         },
       },
     });
 
     const items = workers.map((worker) => {
-      const closedPending = worker.workShifts.filter(
-        (shift) => shift.paymentStatus === PaymentStatus.PENDIENTE && shift.endTime !== null,
+      const providers = new Map<string, ProviderDebt>();
+
+      for (const shift of worker.workShifts) {
+        let provider = providers.get(shift.providerId);
+        if (!provider) {
+          provider = {
+            providerId: shift.providerId,
+            providerName: shift.provider.name,
+            pendingAmount: 0,
+            pendingShifts: 0,
+            lots: [],
+          };
+          providers.set(shift.providerId, provider);
+        }
+        provider.pendingAmount += shift.earnedAmount;
+        provider.pendingShifts += 1;
+
+        // Las jornadas registradas antes de las referencias quedan agrupadas como "Sin referencia".
+        const key = shift.lotId ?? '';
+        let lot = provider.lots.find((item) => (item.lotId ?? '') === key);
+        if (!lot) {
+          lot = {
+            lotId: shift.lotId,
+            reference: shift.lot?.reference ?? 'Sin referencia',
+            closed: shift.lot?.closed ?? false,
+            pendingAmount: 0,
+            pendingShifts: 0,
+          };
+          provider.lots.push(lot);
+        }
+        lot.pendingAmount += shift.earnedAmount;
+        lot.pendingShifts += 1;
+      }
+
+      const breakdown = [...providers.values()].sort(
+        (a, b) => b.pendingAmount - a.pendingAmount || a.providerName.localeCompare(b.providerName),
       );
-      const pendingAmount = closedPending.reduce((sum, shift) => sum + shift.earnedAmount, 0);
-      const pendingShifts = closedPending.length;
+      for (const provider of breakdown) {
+        provider.lots.sort(
+          (a, b) => b.pendingAmount - a.pendingAmount || a.reference.localeCompare(b.reference),
+        );
+      }
+
       return {
         id: worker.id,
         name: worker.name,
         hourlyRate: worker.hourlyRate,
-        pendingAmount,
-        pendingShifts,
+        pendingAmount: breakdown.reduce((sum, item) => sum + item.pendingAmount, 0),
+        pendingShifts: worker.workShifts.length,
+        breakdown,
       };
     });
 

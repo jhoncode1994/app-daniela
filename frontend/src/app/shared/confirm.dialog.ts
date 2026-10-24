@@ -29,6 +29,14 @@ export interface ConfirmData {
       </button>
     </mat-dialog-actions>
   `,
+  styles: [
+    `
+      p {
+        margin: 0;
+        color: var(--color-muted-foreground);
+      }
+    `,
+  ],
 })
 export class ConfirmDialogComponent {
   readonly data = inject<ConfirmData>(MAT_DIALOG_DATA);

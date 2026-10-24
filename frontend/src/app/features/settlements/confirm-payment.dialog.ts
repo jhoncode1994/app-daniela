@@ -7,8 +7,9 @@ import { MoneyPipe } from '../../shared/money.pipe';
 export interface ConfirmPaymentData {
   worker: string;
   provider: string;
-  from: string;
-  to: string;
+  reference: string;
+  from: string | null;
+  to: string | null;
   shiftCount: number;
   netMinutes: number;
   amount: number;
@@ -25,8 +26,16 @@ export interface ConfirmPaymentData {
         <dd>{{ data.worker }}</dd>
         <dt>Proveedor</dt>
         <dd>{{ data.provider }}</dd>
+        <dt>Referencia</dt>
+        <dd>{{ data.reference }}</dd>
         <dt>Periodo</dt>
-        <dd>{{ data.from }} a {{ data.to }}</dd>
+        <dd>
+          @if (data.from || data.to) {
+            {{ data.from ?? 'inicio' }} a {{ data.to ?? 'hoy' }}
+          } @else {
+            Toda la referencia
+          }
+        </dd>
         <dt>Jornadas</dt>
         <dd>{{ data.shiftCount }} · {{ data.netMinutes | duration }}</dd>
       </dl>
@@ -35,7 +44,8 @@ export interface ConfirmPaymentData {
         <strong>{{ data.amount | money }}</strong>
       </p>
       <p class="note">
-        Solo se paga lo de {{ data.provider }}. Al confirmar se descarga el comprobante en PDF.
+        Solo se paga la referencia {{ data.reference }} de {{ data.provider }}. Al confirmar se
+        descarga el comprobante en PDF.
       </p>
     </mat-dialog-content>
     <mat-dialog-actions align="end">

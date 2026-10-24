@@ -61,6 +61,25 @@ Usuario inicial:
 - Usuario: `admin`
 - Contraseña: `admin123` (cámbiela en `.env`)
 
+## Referencias (lotes)
+
+Cada lote que llega al taller se registra como una **referencia dentro de un proveedor**, con
+unidades y valor por unidad (la app multiplica y muestra el valor del lote) y observaciones
+opcionales.
+
+- Al registrar horas se elige proveedor y, enseguida, una de sus referencias abiertas.
+- Al liquidar se elige trabajadora, proveedor y referencia; el total mostrado es solo de esa
+  referencia y se puede destildar jornadas para pagar únicamente lo que se quiera.
+- Cuando el lote sale del taller se le **da de baja**: deja de aparecer al registrar horas, pero
+  sigue en el historial y se puede seguir liquidando.
+- En cada referencia se ve la mano de obra (pagada y por pagar) y la ganancia
+  (valor del lote − mano de obra).
+- En Inicio, el total que se le debe a cada trabajadora viene desglosado por proveedor y
+  referencia.
+
+Las jornadas registradas antes de esta versión quedan sin referencia; se les asigna una
+corrigiendo el registro en el historial.
+
 ## Cálculos
 
 Todo se calcula en el backend, en minutos enteros y pesos enteros:

@@ -42,6 +42,7 @@ async function buildPaymentPdf(payment: PaymentRecord): Promise<{ doc: import('j
   const info: [string, string][] = [
     ['Trabajadora', payment.worker.name],
     ['Proveedor', payment.provider?.name ?? '—'],
+    ['Referencia', payment.lot?.reference ?? '—'],
     ['Fecha de pago', payment.paymentDate],
     [
       'Periodo',
@@ -60,7 +61,7 @@ async function buildPaymentPdf(payment: PaymentRecord): Promise<{ doc: import('j
   const totalNet = shifts.reduce((sum, s) => sum + s.netMinutes, 0);
 
   autoTable(doc, {
-    startY: 155,
+    startY: 171,
     margin: { left: margin, right: margin },
     head: [['Día', 'Entrada', 'Salida', 'Bruto', 'Descuento', 'Horas pagadas', 'Valor hora', 'Total del día']],
     body: shifts.map((s) => [
@@ -113,7 +114,7 @@ async function buildPaymentPdf(payment: PaymentRecord): Promise<{ doc: import('j
   const safe = (text: string) => text.normalize('NFD').replace(/[^\w-]+/g, '_');
   return {
     doc,
-    filename: `pago_${safe(payment.worker.name)}_${safe(payment.provider?.name ?? 'general')}_${payment.paymentDate}.pdf`,
+    filename: `pago_${safe(payment.worker.name)}_${safe(payment.provider?.name ?? 'general')}_${safe(payment.lot?.reference ?? 'sin_ref')}_${payment.paymentDate}.pdf`,
   };
 }
 
@@ -126,7 +127,8 @@ export async function downloadPaymentPdf(payment: PaymentRecord): Promise<void> 
 export async function sharePaymentPdf(payment: PaymentRecord): Promise<void> {
   const { doc, filename } = await buildPaymentPdf(payment);
   const file = new File([doc.output('blob')], filename, { type: 'application/pdf' });
-  const text = `Pago a ${payment.worker.name}${payment.provider ? ` (${payment.provider.name})` : ''} del ${payment.paymentDate}: ${money(payment.amount)}`;
+  const scope = [payment.provider?.name, payment.lot?.reference].filter(Boolean).join(' · ');
+  const text = `Pago a ${payment.worker.name}${scope ? ` (${scope})` : ''} del ${payment.paymentDate}: ${money(payment.amount)}`;
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file], title: 'Comprobante de pago', text });

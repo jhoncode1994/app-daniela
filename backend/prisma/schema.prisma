@@ -35,8 +35,30 @@ model Provider {
 
   workShifts WorkShift[]
   payments   Payment[]
+  lots       Lot[]
 
   @@map("providers")
+}
+
+model Lot {
+  id         String    @id @default(uuid()) @db.Uuid
+  providerId String    @map("provider_id") @db.Uuid
+  provider   Provider  @relation(fields: [providerId], references: [id])
+  reference  String
+  notes      String?
+  units      Int       @default(0)
+  unitPrice  Int       @default(0) @map("unit_price")
+  closed     Boolean   @default(false)
+  closedAt   DateTime? @map("closed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  workShifts WorkShift[]
+  payments   Payment[]
+
+  @@unique([providerId, reference])
+  @@index([providerId, closed])
+  @@map("lots")
 }
 
 model WorkShift {
@@ -45,6 +67,8 @@ model WorkShift {
   worker           Worker        @relation(fields: [workerId], references: [id])
   providerId       String        @map("provider_id") @db.Uuid
   provider         Provider      @relation(fields: [providerId], references: [id])
+  lotId            String?       @map("lot_id") @db.Uuid
+  lot              Lot?          @relation(fields: [lotId], references: [id])
   workDate         DateTime      @map("work_date") @db.Date
   startTime        String        @map("start_time") @db.VarChar(5)
   endTime          String?       @map("end_time") @db.VarChar(5)
@@ -61,6 +85,7 @@ model WorkShift {
 
   @@index([workerId, workDate])
   @@index([providerId, workDate])
+  @@index([lotId, workDate])
   @@index([paymentStatus])
   @@map("work_shifts")
 }
@@ -71,6 +96,8 @@ model Payment {
   worker      Worker    @relation(fields: [workerId], references: [id])
   providerId  String?   @map("provider_id") @db.Uuid
   provider    Provider? @relation(fields: [providerId], references: [id])
+  lotId       String?   @map("lot_id") @db.Uuid
+  lot         Lot?      @relation(fields: [lotId], references: [id])
   paymentDate DateTime  @map("payment_date") @db.Date
   amount      Int
   createdAt   DateTime  @default(now()) @map("created_at")
@@ -81,6 +108,7 @@ model Payment {
 
   @@index([workerId])
   @@index([providerId])
+  @@index([lotId])
   @@map("payments")
 }
 

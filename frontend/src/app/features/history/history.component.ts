@@ -5,13 +5,14 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatChipsModule } from '@angular/material/chips';
+import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { ApiService } from '../../core/api.service';
 import { httpErrorMessage } from '../../core/http-error';
-import { WorkShift, Worker, Provider } from '../../core/models';
+import { Lot, WorkShift, Worker, Provider } from '../../core/models';
 import { EditShiftDialogComponent } from './edit-shift.dialog';
 import { DurationPipe } from '../../shared/duration.pipe';
 import { MoneyPipe } from '../../shared/money.pipe';
@@ -24,12 +25,21 @@ interface DayGroup {
   pendingCount: number;
 }
 
+interface LotDebtRow {
+  lotId: string | null;
+  reference: string;
+  pendingAmount: number;
+  pendingMinutes: number;
+  shiftCount: number;
+}
+
 interface ProviderDebt {
   providerId: string;
   providerName: string;
   pendingAmount: number;
   pendingMinutes: number;
   shiftCount: number;
+  lots: LotDebtRow[];
 }
 
 type QuickFilter = 'all' | 'pending' | 'week' | 'month';
@@ -48,6 +58,7 @@ function formatLocalDate(date: Date): string {
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
+    MatIconModule,
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
@@ -77,19 +88,24 @@ function formatLocalDate(date: Date): string {
           </mat-card>
         </a>
       } @empty {
-        <p class="empty">Todavía no hay trabajadoras.</p>
-        <a mat-flat-button color="primary" routerLink="/trabajadoras">Agregar trabajadora</a>
+        <mat-card class="empty-state">
+          <mat-icon aria-hidden="true">group_add</mat-icon>
+          <p>Todavía no hay trabajadoras.</p>
+          <a mat-flat-button color="primary" routerLink="/trabajadoras">Agregar trabajadora</a>
+        </mat-card>
       }
     } @else {
-      <a mat-button routerLink="/jornadas" class="back">Volver a trabajadoras</a>
+      <a mat-button routerLink="/jornadas" class="back">
+        <mat-icon>arrow_back</mat-icon>
+        Trabajadoras
+      </a>
       <p class="eyebrow">Historial</p>
       <h1>{{ selectedWorker()!.name }}</h1>
-      <div class="quick" role="group" aria-label="Filtros rápidos">
+      <div class="segmented" role="group" aria-label="Filtros rápidos">
         @for (option of quickOptions; track option.id) {
           <button
             type="button"
-            class="quick-chip"
-            [class.active]="quick() === option.id"
+            [class.on]="quick() === option.id"
             [attr.aria-pressed]="quick() === option.id"
             (click)="applyQuick(option.id)"
           >
@@ -107,6 +123,17 @@ function formatLocalDate(date: Date): string {
               <mat-option value="">Todos</mat-option>
               @for (provider of providers(); track provider.id) {
                 <mat-option [value]="provider.id">{{ provider.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          <mat-form-field appearance="outline">
+            <mat-label>Referencia</mat-label>
+            <mat-select formControlName="lotId" (selectionChange)="load()">
+              <mat-option value="">Todas</mat-option>
+              @for (lot of visibleLots(); track lot.id) {
+                <mat-option [value]="lot.id">
+                  {{ lot.reference }}@if (!form.value.providerId) { · {{ lot.provider.name }} }
+                </mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -148,17 +175,30 @@ function formatLocalDate(date: Date): string {
                 <span class="debt-label">{{ debt.providerName }}</span>
                 <strong>{{ debt.pendingAmount | money }}</strong>
                 <p>{{ debt.pendingMinutes | duration }} · {{ debt.shiftCount }} registro(s)</p>
-                <a
-                  mat-button
-                  color="primary"
-                  [routerLink]="['/liquidaciones']"
-                  [queryParams]="{
-                    workerId: selectedWorker()!.id,
-                    providerId: debt.providerId
-                  }"
-                >
-                  Liquidar
-                </a>
+                <ul class="debt-lots">
+                  @for (lot of debt.lots; track lot.lotId ?? 'none') {
+                    <li>
+                      @if (!lot.lotId) {
+                        <span class="debt-lot-plain">
+                          <span>{{ lot.reference }}</span>
+                          <strong>{{ lot.pendingAmount | money }}</strong>
+                        </span>
+                      } @else {
+                        <a
+                          [routerLink]="['/liquidaciones']"
+                          [queryParams]="{
+                            workerId: selectedWorker()!.id,
+                            providerId: debt.providerId,
+                            lotId: lot.lotId,
+                          }"
+                        >
+                          <span>{{ lot.reference }}</span>
+                          <strong>{{ lot.pendingAmount | money }}</strong>
+                        </a>
+                      }
+                    </li>
+                  }
+                </ul>
               </mat-card>
             }
           </div>
@@ -167,7 +207,10 @@ function formatLocalDate(date: Date): string {
             <strong>{{ totalPending() | money }}</strong>
           </mat-card>
         } @else {
-          <p class="empty">No hay montos pendientes con ningún proveedor.</p>
+          <mat-card class="empty-state">
+            <mat-icon aria-hidden="true">task_alt</mat-icon>
+            <p>Al día: no hay montos pendientes con ningún proveedor.</p>
+          </mat-card>
         }
       </section>
 
@@ -186,13 +229,18 @@ function formatLocalDate(date: Date): string {
                   <p class="time">{{ shift.startTime }} – {{ shift.endTime }}</p>
                   <p>
                     {{ shift.provider.name }} ·
+                    <span class="ref">{{ shift.lot?.reference ?? 'Sin referencia' }}</span> ·
                     Alimentación {{ shift.mealBreakMinutes }} min ·
                     {{ shift.netMinutes | duration }} ·
                     {{ shift.earnedAmount | money }}
                   </p>
                 } @else {
                   <p class="time">{{ shift.startTime }} – en curso</p>
-                  <p>{{ shift.provider.name }} · Ingreso abierto · aún no suma al total</p>
+                  <p>
+                    {{ shift.provider.name }} ·
+                    <span class="ref">{{ shift.lot?.reference ?? 'Sin referencia' }}</span> ·
+                    Ingreso abierto · aún no suma al total
+                  </p>
                 }
               </div>
               <div class="segment-actions">
@@ -214,69 +262,45 @@ function formatLocalDate(date: Date): string {
           }
         </mat-card>
       } @empty {
-        <p class="empty">No hay registros con estos filtros.</p>
-        <a
-          mat-stroked-button
-          [routerLink]="['/jornadas/nueva']"
-          [queryParams]="{ workerId: selectedWorker()!.id }"
-        >
-          Registrar la primera jornada
-        </a>
+        <mat-card class="empty-state">
+          <mat-icon aria-hidden="true">event_busy</mat-icon>
+          <p>No hay registros con estos filtros.</p>
+          <a
+            mat-stroked-button
+            [routerLink]="['/jornadas/nueva']"
+            [queryParams]="{ workerId: selectedWorker()!.id }"
+          >
+            Registrar una jornada
+          </a>
+        </mat-card>
       }
     }
     </div>
   `,
   styles: [
     `
-      .eyebrow {
-        margin: 0 0 4px;
-        color: var(--color-primary);
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
-      }
-      .hint,
       .empty,
       .day-total {
         color: var(--color-muted-foreground);
       }
       .back {
-        margin: 0 0 8px -8px;
+        margin: 0 0 var(--space-sm) -8px;
+        display: inline-flex;
+        gap: 4px;
+        color: var(--color-muted-foreground);
       }
-      .quick {
-        display: flex;
-        gap: 8px;
-        overflow-x: auto;
-        padding: 2px 2px 10px;
-        margin-bottom: 4px;
-        scrollbar-width: none;
+      .back mat-icon {
+        width: 19px;
+        height: 19px;
+        font-size: 19px;
       }
-      .quick::-webkit-scrollbar {
-        display: none;
-      }
-      .quick-chip {
-        flex: 0 0 auto;
-        min-height: 44px;
-        padding: 0 18px;
-        border-radius: 999px;
-        border: 1px solid var(--color-border);
-        background: var(--color-card);
-        color: var(--color-foreground);
-        font: inherit;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
-      }
-      .quick-chip.active {
-        background: var(--color-primary);
-        border-color: var(--color-primary);
-        color: var(--color-on-primary);
+      .segmented {
+        margin: 0 0 var(--space-md);
       }
       .advanced {
         margin-bottom: var(--space-md);
         border: 1px solid var(--color-border);
-        border-radius: var(--radius-sm);
+        border-radius: var(--radius);
         background: var(--color-card);
         padding: 0 var(--space-md);
       }
@@ -287,6 +311,38 @@ function formatLocalDate(date: Date): string {
         font-weight: 600;
         color: var(--color-primary);
         cursor: pointer;
+      }
+      .ref {
+        color: var(--color-primary);
+        font-weight: 600;
+      }
+      .debt-lots {
+        list-style: none;
+        margin: 8px 0 0;
+        padding: 0;
+        display: grid;
+        gap: 2px;
+      }
+      .debt-lots a,
+      .debt-lot-plain {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 38px;
+        padding: 2px 0;
+        color: inherit;
+        text-decoration: none;
+        border-top: 1px dashed var(--color-border);
+      }
+      .debt-lots a strong {
+        color: var(--color-primary);
+        white-space: nowrap;
+      }
+      .debt-lots a span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
       .advanced form {
         padding-bottom: var(--space-sm);
@@ -304,14 +360,16 @@ function formatLocalDate(date: Date): string {
         padding: var(--space-md);
       }
       .avatar {
-        width: 44px;
-        height: 44px;
-        border-radius: 14px;
+        width: 46px;
+        height: 46px;
+        border-radius: 15px;
         display: grid;
         place-items: center;
-        background: var(--color-muted);
+        background: linear-gradient(145deg, var(--color-muted), var(--surface-3));
+        border: 1px solid var(--color-border);
         color: var(--color-primary);
-        font-weight: 700;
+        font-size: 1.15rem;
+        font-weight: 800;
         flex-shrink: 0;
       }
       .day {
@@ -350,14 +408,18 @@ function formatLocalDate(date: Date): string {
       }
       .day-head strong {
         color: var(--color-primary);
+        font-size: 1.15rem;
+        font-weight: 800;
+      }
+      .day-head h3 {
         font-size: 1.05rem;
       }
       .segment {
         display: flex;
         flex-direction: column;
         gap: 8px;
-        padding-top: 10px;
-        margin-top: 10px;
+        padding-top: 12px;
+        margin-top: 12px;
         border-top: 1px solid var(--color-border);
       }
       .row-buttons {
@@ -383,6 +445,7 @@ function formatLocalDate(date: Date): string {
       }
       mat-chip {
         background: var(--color-muted);
+        font-weight: 700 !important;
       }
       mat-chip.paid {
         background: var(--color-success-soft);
@@ -423,20 +486,22 @@ function formatLocalDate(date: Date): string {
         display: flex;
         flex-direction: column;
         gap: 4px;
-        background: linear-gradient(180deg, var(--tint) 0%, var(--color-card) 100%);
+        background: linear-gradient(170deg, var(--tint) 0%, var(--color-card) 60%);
         border-color: var(--color-primary-line);
       }
       .debt-label {
         color: var(--color-primary);
-        font-size: 0.8rem;
-        font-weight: 700;
-        letter-spacing: 0.04em;
+        font-size: 0.72rem;
+        font-weight: 800;
+        letter-spacing: 0.1em;
         text-transform: uppercase;
       }
       .debt-card strong,
       .debt-total strong {
         color: var(--color-primary);
-        font-size: 1.25rem;
+        font-size: 1.35rem;
+        font-weight: 800;
+        letter-spacing: -0.02em;
       }
       .debt-card p {
         margin: 0;
@@ -476,6 +541,15 @@ export class HistoryComponent implements OnInit {
   ];
   readonly form;
 
+  readonly lots = signal<Lot[]>([]);
+  readonly providerFilter = signal('');
+
+  readonly visibleLots = computed(() => {
+    const providerId = this.providerFilter();
+    const lots = this.lots();
+    return providerId ? lots.filter((lot) => lot.providerId === providerId) : lots;
+  });
+
   readonly selectedWorker = computed(() => {
     const id = this.selectedWorkerId();
     return this.workers().find((worker) => worker.id === id) ?? null;
@@ -487,22 +561,45 @@ export class HistoryComponent implements OnInit {
       if (!shift.endTime || shift.paymentStatus !== 'PENDIENTE') {
         continue;
       }
-      const existing = map.get(shift.providerId);
-      if (existing) {
-        existing.pendingAmount += shift.earnedAmount;
-        existing.pendingMinutes += shift.netMinutes;
-        existing.shiftCount += 1;
-      } else {
-        map.set(shift.providerId, {
+      let provider = map.get(shift.providerId);
+      if (!provider) {
+        provider = {
           providerId: shift.providerId,
           providerName: shift.provider.name,
-          pendingAmount: shift.earnedAmount,
-          pendingMinutes: shift.netMinutes,
-          shiftCount: 1,
-        });
+          pendingAmount: 0,
+          pendingMinutes: 0,
+          shiftCount: 0,
+          lots: [],
+        };
+        map.set(shift.providerId, provider);
       }
+      provider.pendingAmount += shift.earnedAmount;
+      provider.pendingMinutes += shift.netMinutes;
+      provider.shiftCount += 1;
+
+      const key = shift.lotId ?? '';
+      let lot = provider.lots.find((item) => (item.lotId ?? '') === key);
+      if (!lot) {
+        lot = {
+          lotId: shift.lotId,
+          reference: shift.lot?.reference ?? 'Sin referencia',
+          pendingAmount: 0,
+          pendingMinutes: 0,
+          shiftCount: 0,
+        };
+        provider.lots.push(lot);
+      }
+      lot.pendingAmount += shift.earnedAmount;
+      lot.pendingMinutes += shift.netMinutes;
+      lot.shiftCount += 1;
     }
-    return [...map.values()].sort((a, b) => a.providerName.localeCompare(b.providerName, 'es'));
+    const debts = [...map.values()].sort((a, b) =>
+      a.providerName.localeCompare(b.providerName, 'es'),
+    );
+    for (const debt of debts) {
+      debt.lots.sort((a, b) => b.pendingAmount - a.pendingAmount);
+    }
+    return debts;
   });
 
   readonly totalPending = computed(() =>
@@ -545,14 +642,24 @@ export class HistoryComponent implements OnInit {
   ) {
     this.form = fb.nonNullable.group({
       providerId: [''],
+      lotId: [''],
       from: [''],
       to: [''],
       paymentStatus: [''],
+    });
+    this.form.controls.providerId.valueChanges.subscribe(() => {
+      this.form.patchValue({ lotId: '' }, { emitEvent: false });
+      this.providerFilter.set(this.form.getRawValue().providerId);
     });
   }
 
   ngOnInit(): void {
     this.api.getProviders().subscribe((providers) => this.providers.set(providers));
+    this.api.getLots().subscribe((lots) => this.lots.set(lots));
+    const queryLotId = this.route.snapshot.queryParamMap.get('lotId');
+    if (queryLotId) {
+      this.form.patchValue({ lotId: queryLotId }, { emitEvent: false });
+    }
     this.api.getWorkers().subscribe((workers) => {
       this.workers.set(workers);
       this.loadingWorkers.set(false);
@@ -604,6 +711,7 @@ export class HistoryComponent implements OnInit {
       .getShifts({
         workerId,
         providerId: value.providerId || undefined,
+        lotId: value.lotId || undefined,
         from: value.from || undefined,
         to: value.to || undefined,
         paymentStatus: value.paymentStatus || undefined,
@@ -625,7 +733,13 @@ export class HistoryComponent implements OnInit {
 
   edit(shift: WorkShift): void {
     this.dialog
-      .open(EditShiftDialogComponent, { width: 'min(420px, 92vw)', data: shift })
+      .open(EditShiftDialogComponent, {
+        width: 'min(420px, 92vw)',
+        data: {
+          shift,
+          lots: this.lots().filter((lot) => lot.providerId === shift.providerId),
+        },
+      })
       .afterClosed()
       .subscribe((changes) => {
         if (!changes) {

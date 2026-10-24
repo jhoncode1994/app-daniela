@@ -23,7 +23,11 @@ export class PaymentsController {
   }
 
   @Get('payments')
-  findAll(@Query('workerId') workerId?: string, @Query('providerId') providerId?: string) {
-    return this.paymentsService.findAll(workerId, providerId);
+  findAll(
+    @Query('workerId') workerId?: string,
+    @Query('providerId') providerId?: string,
+    @Query('lotId') lotId?: string,
+  ) {
+    return this.paymentsService.findAll(workerId, providerId, lotId);
   }
 }
